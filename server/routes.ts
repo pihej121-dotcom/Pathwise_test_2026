@@ -2392,6 +2392,35 @@ Make your recommendations specific, actionable, and data-driven based on the act
     }
   });
 
+  // Public career analysis endpoint (no auth required)
+  app.post("/api/ai/career-analysis", async (req, res) => {
+    try {
+      const { systemPrompt, userPrompt } = req.body;
+      if (!systemPrompt || !userPrompt) {
+        return res.status(400).json({ error: "Missing prompt data" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 1200,
+        temperature: 0.7,
+      });
+
+      const analysis = completion.choices[0]?.message?.content || "";
+      res.json({ analysis });
+    } catch (error) {
+      console.error("Career analysis error:", error);
+      res.status(500).json({ error: "Failed to generate career analysis" });
+    }
+  });
+
   // AI Co-pilot routes
   app.post("/api/ai/cover-letter", authenticate, async (req: AuthRequest, res) => {
     try {

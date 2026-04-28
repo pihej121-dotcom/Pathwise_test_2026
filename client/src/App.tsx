@@ -8,6 +8,7 @@ import { TourProvider } from "@/contexts/TourContext";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 
 // Pages
+import ChatHome from "@/pages/ChatHome";
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -72,9 +73,9 @@ function RoleBasedHome() {
     </div>;
   }
   
-  // If not authenticated, Dashboard will show public experience
+  // If not authenticated, show new chat-based home
   if (!user) {
-    return <Dashboard />;
+    return <ChatHome />;
   }
   
   const userRole = user.role;
@@ -121,6 +122,7 @@ function Router() {
       <Route path="/checkout" component={Checkout} />
       <Route path="/checkout/success" component={CheckoutSuccess} />
       <Route path="/terms" component={TermsOfService} />
+      <Route path="/chat" component={ChatHome} />
       
       {/* Role-based home route */}
       <Route path="/" component={RoleBasedHome} />
