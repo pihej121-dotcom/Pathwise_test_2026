@@ -864,13 +864,17 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
-export const registerSchema = insertUserSchema.extend({
-  confirmPassword: z.string().min(6),
+export const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  confirmPassword: z.string().min(6).optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  school: z.string().optional(),
+  major: z.string().optional(),
+  gradYear: z.number().optional(),
   invitationToken: z.string().optional(),
   selectedPlan: z.enum(['free', 'paid']).optional(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
 });
 
 export const inviteUserSchema = z.object({

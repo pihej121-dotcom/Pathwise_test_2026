@@ -76,7 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: validationError.message });
       }
       
-      const { email, password, firstName, lastName, school, major, gradYear, invitationToken, selectedPlan } = req.body;
+      const { email, password, school, major, gradYear, invitationToken, selectedPlan } = req.body;
+      const firstName: string = req.body.firstName || "";
+      const lastName: string = req.body.lastName || "";
       
       // Check if user exists
       const existingUser = await storage.getUserByEmail(email);
