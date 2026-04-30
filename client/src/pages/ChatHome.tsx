@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -120,7 +120,6 @@ function TypingIndicator() {
 
 export default function ChatHome() {
   const { user, logout } = useAuth();
-  const [, navigate] = useLocation();
 
   // Fetch resume analysis history for logged-in users
   const { data: resumeHistory } = useQuery<any[]>({
@@ -482,27 +481,27 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("/resume")}>
+                  <DropdownMenuItem onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}>
                     <FileText className="w-4 h-4 mr-2" />
                     Resume Analysis
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/roadmap")}>
+                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
                     <Route className="w-4 h-4 mr-2" />
                     Career Roadmap
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/jobs")}>
+                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me find jobs that match my skills and experience")}>
                     <Briefcase className="w-4 h-4 mr-2" />
                     Job Matching
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/micro-projects")}>
+                  <DropdownMenuItem onClick={() => handleInitialMessage("Suggest portfolio projects I can build to strengthen my resume")}>
                     <Zap className="w-4 h-4 mr-2" />
                     Micro-Projects
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/interview-prep")}>
+                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me prepare for an upcoming interview")}>
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Interview Prep
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/applications")}>
+                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me track and manage my job applications")}>
                     <ClipboardList className="w-4 h-4 mr-2" />
                     Applications
                   </DropdownMenuItem>
@@ -575,21 +574,21 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                 )}
                 {resumeHistory && resumeHistory.length > 0 && (
                   <button
-                    onClick={() => navigate("/resume")}
+                    onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}
                     className="group bg-card border border-border/60 rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
                   >
                     <p className="text-xs text-muted-foreground mb-1">Analyses Run</p>
                     <p className="text-2xl font-bold text-foreground">{resumeHistory.length}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">See history →</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Analyze again →</p>
                   </button>
                 )}
                 <button
-                  onClick={() => navigate("/roadmap")}
+                  onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}
                   className="group bg-card border border-border/60 rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
                 >
                   <p className="text-xs text-muted-foreground mb-1">Career Roadmap</p>
-                  <p className="text-sm font-semibold text-foreground mt-1">View plan</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Open tool →</p>
+                  <p className="text-sm font-semibold text-foreground mt-1">Build plan</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Start chat →</p>
                 </button>
               </div>
             )}
@@ -600,15 +599,15 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                 <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">Quick tools</p>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: "Resume Analysis", href: "/resume", icon: FileText },
-                    { label: "Job Matching", href: "/jobs", icon: Briefcase },
-                    { label: "Career Roadmap", href: "/roadmap", icon: Route },
-                    { label: "Interview Prep", href: "/interview-prep", icon: MessageSquare },
-                    { label: "Micro-Projects", href: "/micro-projects", icon: Zap },
-                  ].map(({ label, href, icon: Icon }) => (
+                    { label: "Resume Analysis", prompt: "Analyze my resume and give me detailed feedback", icon: FileText },
+                    { label: "Job Matching", prompt: "Help me find jobs that match my skills and experience", icon: Briefcase },
+                    { label: "Career Roadmap", prompt: "Help me build a career roadmap for my goals", icon: Route },
+                    { label: "Interview Prep", prompt: "Help me prepare for an upcoming interview", icon: MessageSquare },
+                    { label: "Micro-Projects", prompt: "Suggest portfolio projects I can build to strengthen my resume", icon: Zap },
+                  ].map(({ label, prompt, icon: Icon }) => (
                     <button
-                      key={href}
-                      onClick={() => navigate(href)}
+                      key={label}
+                      onClick={() => handleInitialMessage(prompt)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 text-xs text-muted-foreground hover:text-foreground transition-all"
                     >
                       <Icon className="w-3.5 h-3.5" />

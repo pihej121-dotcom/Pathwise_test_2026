@@ -11,7 +11,6 @@ import {
   FileText, 
   Route, 
   Briefcase, 
-  Wand2, 
   CheckSquare, 
   MessageSquare,
   Settings,
@@ -20,20 +19,16 @@ import {
   UserPlus,
   Crown,
   Zap,
-  Sparkles,
-  Upload
 } from "lucide-react";
 
 const studentNavigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, requiresPaid: false },
-  { name: "Resume Upload", href: "/resume-upload", icon: Upload, requiresPaid: false },
-  { name: "Resume Analysis", href: "/resume", icon: FileText, requiresPaid: false },
-  { name: "Career Roadmap", href: "/roadmap", icon: Route, requiresPaid: true },
-  { name: "Job Matching", href: "/jobs", icon: Briefcase, requiresPaid: true },
-  { name: "Micro-Projects", href: "/micro-projects", icon: Zap, requiresPaid: true },
-  { name: "AI Career Copilot", href: "/ai-copilot", icon: Wand2, requiresPaid: false },
-  { name: "Applications", href: "/applications", icon: CheckSquare, requiresPaid: true },
-  { name: "Interview Prep", href: "/interview-prep", icon: MessageSquare, requiresPaid: true },
+  { name: "Home", href: "/", icon: LayoutDashboard, requiresPaid: false },
+  { name: "Resume Analysis", href: "/", icon: FileText, requiresPaid: false },
+  { name: "Career Roadmap", href: "/", icon: Route, requiresPaid: true },
+  { name: "Job Matching", href: "/", icon: Briefcase, requiresPaid: true },
+  { name: "Micro-Projects", href: "/", icon: Zap, requiresPaid: true },
+  { name: "Applications", href: "/", icon: CheckSquare, requiresPaid: true },
+  { name: "Interview Prep", href: "/", icon: MessageSquare, requiresPaid: true },
 ];
 
 const adminNavigation = [
