@@ -76,7 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: validationError.message });
       }
       
-      const { email, password, firstName, lastName, school, major, gradYear, invitationToken, selectedPlan } = req.body;
+      const { email, password, school, major, gradYear, invitationToken, selectedPlan } = req.body;
+      const firstName: string = req.body.firstName || "";
+      const lastName: string = req.body.lastName || "";
       
       // Check if user exists
       const existingUser = await storage.getUserByEmail(email);
@@ -2389,6 +2391,119 @@ Make your recommendations specific, actionable, and data-driven based on the act
     } catch (error) {
       console.error("Update application status error:", error);
       res.status(500).json({ error: "Failed to update application status" });
+    }
+  });
+
+  // Public career analysis endpoint (no auth required)
+  app.post("/api/ai/career-analysis", async (req, res) => {
+    try {
+      const { systemPrompt, userPrompt } = req.body;
+      if (!systemPrompt || !userPrompt) {
+        return res.status(400).json({ error: "Missing prompt data" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 1200,
+        temperature: 0.7,
+      });
+
+      const analysis = completion.choices[0]?.message?.content || "";
+      res.json({ analysis });
+    } catch (error) {
+      console.error("Career analysis error:", error);
+      res.status(500).json({ error: "Failed to generate career analysis" });
+    }
+  });
+
+  // Authenticated resume score generation from chat flow — generates score and persists it
+  app.post("/api/ai/chat-resume-score", authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { resumeText, targetRole, targetIndustry, targetCompanies, preferredLocation, background } = req.body;
+      if (!resumeText) {
+        return res.status(400).json({ error: "Resume text is required" });
+      }
+
+      const userId = req.user!.id;
+
+      // Run full analysis via the existing AIService
+      const analysis = await aiService.analyzeResume(
+        userId,
+        resumeText,
+        targetRole,
+        targetIndustry,
+        targetCompanies
+      );
+
+      // Get or create the user's active resume record to attach the score
+      let resume = await storage.getActiveResume(userId);
+
+      if (!resume) {
+        // Create a lightweight resume entry to hold the score
+        resume = await storage.createResume({
+          userId,
+          fileName: "Chat Resume",
+          filePath: "chat://inline",
+          extractedText: resumeText,
+          isActive: true,
+        });
+      }
+
+      // Persist the analysis scores
+      await storage.updateResumeAnalysis(resume.id, {
+        rmsScore: analysis.rmsScore,
+        skillsScore: analysis.skillsScore,
+        experienceScore: analysis.experienceScore,
+        keywordsScore: analysis.keywordsScore,
+        educationScore: analysis.educationScore,
+        certificationsScore: analysis.certificationsScore,
+        overallInsights: analysis.overallInsights,
+        sectionAnalysis: analysis.sectionAnalysis,
+        gaps: analysis.gaps,
+        targetRole: targetRole || null,
+        targetIndustry: targetIndustry || null,
+        targetCompanies: targetCompanies || null,
+        analysisHash: { hash: analysis.analysisHash, method: "chat", source: "chat-flow" },
+      });
+
+      // Save to history
+      try {
+        await storage.createResumeAnalysisHistory({
+          userId,
+          resumeId: resume.id,
+          fileName: resume.fileName,
+          rmsScore: analysis.rmsScore,
+          skillsScore: analysis.skillsScore,
+          experienceScore: analysis.experienceScore,
+          keywordsScore: analysis.keywordsScore,
+          educationScore: analysis.educationScore,
+          certificationsScore: analysis.certificationsScore,
+          overallInsights: analysis.overallInsights as any,
+          sectionAnalysis: analysis.sectionAnalysis as any,
+          gaps: analysis.gaps as any,
+          targetRole: targetRole || null,
+          targetIndustry: targetIndustry || null,
+        });
+      } catch (histErr) {
+        console.warn("Could not save resume analysis history:", histErr);
+      }
+
+      res.json({
+        rmsScore: analysis.rmsScore,
+        skillsScore: analysis.skillsScore,
+        experienceScore: analysis.experienceScore,
+        overallInsights: analysis.overallInsights,
+      });
+    } catch (error) {
+      console.error("Chat resume score error:", error);
+      res.status(500).json({ error: "Failed to generate resume score" });
     }
   });
 
