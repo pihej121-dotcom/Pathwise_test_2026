@@ -35,7 +35,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Logo } from "@/components/Logo";
 
 type ConversationState =
@@ -43,10 +43,11 @@ type ConversationState =
   | "collecting"
   | "resume_upload"
   | "job_details"
+  | "targeting"
   | "generating"
   | "complete";
 
-type GoalType = "competitiveness" | "readiness" | "roadmap" | "interview" | "projects" | "general" | null;
+type GoalType = "competitiveness" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "general" | null;
 
 type CollectedData = {
   userMessage: string;
@@ -54,6 +55,12 @@ type CollectedData = {
   answers: Record<string, string>;
   resumeText: string;
   jobDetails: string;
+  // targeting fields for resume score
+  targetRole: string;
+  targetIndustry: string;
+  targetCompanies: string;
+  preferredLocation: string;
+  targetingStep: number;
 };
 
 type Message = {
@@ -62,6 +69,14 @@ type Message = {
   content: string;
   timestamp: Date;
 };
+
+// Targeting questions specifically for resume score flow
+const RESUME_SCORE_TARGETING_QUESTIONS = [
+  { key: "targetRole", question: "What is your target role or career? (e.g. Software Engineer, Product Manager, Data Analyst)" },
+  { key: "targetIndustry", question: "What industry or field are you targeting? (e.g. Technology, Finance, Healthcare, Marketing)" },
+  { key: "targetCompanies", question: "What type of companies are you targeting? You can name specific companies or describe the type. (e.g. Google, startups, mid-size tech firms, Fortune 500)" },
+  { key: "preferredLocation", question: "Any preferred location or work arrangement? (e.g. New York, remote, open to relocation — type \"skip\" to skip)" },
+];
 
 const FOLLOW_UP_QUESTIONS: Record<string, { key: string; question: string }[]> = {
   competitiveness: [
@@ -87,6 +102,9 @@ const FOLLOW_UP_QUESTIONS: Record<string, { key: string; question: string }[]> =
     { key: "skills", question: "What skills or tools are you looking to build or practice?" },
     { key: "goal", question: "What's your end goal? (e.g. build a portfolio, land a specific role, learn something new)" },
   ],
+  resume_score: [
+    { key: "background", question: "Tell me a bit about yourself — what's your school year (or years of experience), major/field, and university (or current company)?" },
+  ],
   general: [
     { key: "background", question: "Tell me a bit about yourself — school year, major, and university?" },
     { key: "goal", question: "What specific outcome are you hoping for from our conversation?" },
@@ -100,6 +118,7 @@ function detectGoal(message: string): GoalType {
   if (lower.match(/roadmap|plan|next steps|action plan|3.?month|6.?month|path/)) return "roadmap";
   if (lower.match(/interview|prep|practice|behav|technical interview|case study/)) return "interview";
   if (lower.match(/project|portfolio|build|practice project|side project/)) return "projects";
+  if (lower.match(/score|analyze.*resume|resume.*analys|feedback.*resume|resume.*feedback|rate.*resume|resume.*rate/)) return "resume_score";
   return "general";
 }
 
@@ -161,6 +180,7 @@ function TypingIndicator() {
 
 export default function ChatHome() {
   const { user, logout } = useAuth();
+  const queryClient = useQueryClient();
 
   // Fetch resume analysis history for logged-in users
   const { data: resumeHistory } = useQuery<any[]>({
@@ -183,11 +203,17 @@ export default function ChatHome() {
     answers: {},
     resumeText: "",
     jobDetails: "",
+    targetRole: "",
+    targetIndustry: "",
+    targetCompanies: "",
+    preferredLocation: "",
+    targetingStep: 0,
   });
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [currentSessionPrompt, setCurrentSessionPrompt] = useState<string>("");
+  const [resumeScore, setResumeScore] = useState<number | null>(null);
 
   // Load saved sessions when user is available
   useEffect(() => {
@@ -273,8 +299,117 @@ export default function ChatHome() {
       await simulateAssistantReply(
         "One more thing — to give you an accurate competitiveness analysis, I need the actual job requirements.\n\n**Best option:** Paste the qualifications and responsibilities text directly from the job posting.\n\n**Also works:** Paste the job URL (note: I'll do my best but may ask you to copy/paste the text if I can't access it).\n\nThe more detail you give me, the more precise my analysis will be."
       );
+    } else if (data.goal === "resume_score") {
+      // Move into targeting collection
+      setState("targeting");
+      setData((prev) => ({ ...prev, resumeText, targetingStep: 0 }));
+      await simulateAssistantReply(
+        `Great! Now I need a few targeting details so I can score your resume accurately.\n\n${RESUME_SCORE_TARGETING_QUESTIONS[0].question}`
+      );
     } else {
       await generateAnalysis({ ...data, resumeText });
+    }
+  };
+
+  const handleTargetingAnswer = async (text: string) => {
+    const step = data.targetingStep;
+    const q = RESUME_SCORE_TARGETING_QUESTIONS[step];
+    const value = text.toLowerCase() === "skip" ? "" : text;
+
+    // Store answer in the right field
+    const fieldUpdates: Partial<CollectedData> = {};
+    if (q.key === "targetRole") fieldUpdates.targetRole = value;
+    else if (q.key === "targetIndustry") fieldUpdates.targetIndustry = value;
+    else if (q.key === "targetCompanies") fieldUpdates.targetCompanies = value;
+    else if (q.key === "preferredLocation") fieldUpdates.preferredLocation = value;
+
+    const updatedData: CollectedData = { ...data, ...fieldUpdates, targetingStep: step + 1 };
+    setData(updatedData);
+
+    const nextStep = step + 1;
+    if (nextStep < RESUME_SCORE_TARGETING_QUESTIONS.length) {
+      await simulateAssistantReply(RESUME_SCORE_TARGETING_QUESTIONS[nextStep].question);
+    } else {
+      // All targeting data collected — generate score
+      await generateResumeScore(updatedData);
+    }
+  };
+
+  const generateResumeScore = async (finalData: CollectedData) => {
+    setState("generating");
+    await simulateAssistantReply(
+      "Perfect! I have everything I need. Scoring your resume now… ✨",
+      600
+    );
+    setIsTyping(true);
+
+    try {
+      if (user) {
+        // Authenticated path: call the persist endpoint
+        const response = await fetch("/api/ai/chat-resume-score", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            resumeText: finalData.resumeText,
+            targetRole: finalData.targetRole,
+            targetIndustry: finalData.targetIndustry,
+            targetCompanies: finalData.targetCompanies,
+            preferredLocation: finalData.preferredLocation,
+            background: finalData.answers.background,
+          }),
+        });
+
+        if (!response.ok) throw new Error("Score generation failed");
+        const result = await response.json();
+        const score = result.rmsScore;
+        setResumeScore(score);
+
+        const insights = result.overallInsights || {};
+        const scoreExplanation = insights.scoreExplanation || "";
+        const strengths = insights.strengthsOverview || "";
+        const weaknesses = insights.weaknessesOverview || "";
+        const recommendations: string[] = insights.keyRecommendations || [];
+
+        setIsTyping(false);
+
+        let msg = `## Your Resume Score: ${score}/100\n\n`;
+        if (scoreExplanation) msg += `${scoreExplanation}\n\n`;
+        if (strengths) msg += `## ✅ Key Strengths\n${strengths}\n\n`;
+        if (weaknesses) msg += `## ⚠️ Areas to Improve\n${weaknesses}\n\n`;
+        if (recommendations.length > 0) {
+          msg += `## 🚀 Top Recommendations\n`;
+          recommendations.forEach((r, i) => {
+            msg += `${i + 1}. ${r}\n`;
+          });
+        }
+        msg += `\nYour score has been saved to your profile and will appear on your dashboard.`;
+
+        addMessage("assistant", msg);
+      } else {
+        // Guest path: use regular AI analysis without saving
+        await generateAnalysis(finalData);
+        setIsTyping(false);
+        return;
+      }
+
+      setState("complete");
+      // Refresh the resume query to update the score card
+      if (user) {
+        queryClient.invalidateQueries({ queryKey: ["/api/resumes/active"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/resume-analysis-history"] });
+        const updated = saveSession(user.id, currentSessionPrompt || finalData.userMessage, [
+          ...messages,
+        ]);
+        setSavedSessions(updated);
+      }
+    } catch (err) {
+      setIsTyping(false);
+      addMessage(
+        "assistant",
+        "I had trouble generating your full score. Let me give you some quick feedback instead:\n\n## Quick Resume Tips\n- Quantify your achievements with numbers and metrics\n- Tailor keywords to match your target role and industry\n- Keep it to 1 page (or 2 for 10+ years of experience)\n- Add a strong summary section at the top\n- Highlight relevant skills in a dedicated section\n\nSign in to get your full AI-powered score and track your progress!"
+      );
+      setState("complete");
     }
   };
 
@@ -463,6 +598,9 @@ After all projects, add a brief **Encouraging Closing Note**.`;
     } else if (state === "job_details") {
       addMessage("user", text);
       await handleJobDetails(text);
+    } else if (state === "targeting") {
+      addMessage("user", text);
+      await handleTargetingAnswer(text);
     }
   };
 
@@ -479,6 +617,12 @@ After all projects, add a brief **Encouraging Closing Note**.`;
       await simulateAssistantReply(
         "Got your resume! One more thing — to give you an accurate competitiveness analysis, I need the specific job details.\n\nPlease paste:\n• The job posting URL, OR\n• The qualifications and responsibilities from the posting"
       );
+    } else if (data.goal === "resume_score") {
+      setData((prev) => ({ ...prev, resumeText, targetingStep: 0 }));
+      setState("targeting");
+      await simulateAssistantReply(
+        `Got your resume! Now I need a few targeting details so I can score it accurately.\n\n${RESUME_SCORE_TARGETING_QUESTIONS[0].question}`
+      );
     } else {
       await generateAnalysis({ ...data, resumeText });
     }
@@ -494,7 +638,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
   const resetChat = () => {
     setMessages([]);
     setState("idle");
-    setData({ userMessage: "", goal: null, answers: {}, resumeText: "", jobDetails: "" });
+    setData({ userMessage: "", goal: null, answers: {}, resumeText: "", jobDetails: "", targetRole: "", targetIndustry: "", targetCompanies: "", preferredLocation: "", targetingStep: 0 });
     setQuestionIndex(0);
     setIsTyping(false);
     setInputValue("");
@@ -507,6 +651,11 @@ After all projects, add a brief **Encouraging Closing Note**.`;
     if (state === "idle") return "Tell me what you need help with…";
     if (state === "resume_upload") return "Paste your resume text, or type \"skip\"…";
     if (state === "job_details") return "Paste the job URL or qualifications/responsibilities…";
+    if (state === "targeting") {
+      const q = RESUME_SCORE_TARGETING_QUESTIONS[data.targetingStep];
+      if (q?.key === "preferredLocation") return "Type your preferred location, or \"skip\"…";
+      return "Type your answer…";
+    }
     return "Type your answer…";
   };
 
@@ -635,10 +784,10 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                     <TrendingUp className="w-3.5 h-3.5 text-primary" />
                     Resume Score
                   </div>
-                  {activeResume?.rmsScore != null ? (
+                  {(resumeScore != null || activeResume?.rmsScore != null) ? (
                     <>
                       <p className="text-2xl font-bold text-primary leading-tight">
-                        {activeResume.rmsScore}
+                        {resumeScore ?? activeResume?.rmsScore}
                         <span className="text-sm font-normal text-muted-foreground">/100</span>
                       </p>
                       <button
@@ -926,6 +1075,12 @@ After all projects, add a brief **Encouraging Closing Note**.`;
               <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Link2 className="w-3.5 h-3.5 flex-shrink-0" />
                 Paste the job description text <span className="font-medium text-foreground">(recommended)</span> or a job URL
+              </div>
+            )}
+            {state === "targeting" && (
+              <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <TrendingUp className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                <span>Targeting details — step <span className="font-medium text-foreground">{data.targetingStep + 1}</span> of {RESUME_SCORE_TARGETING_QUESTIONS.length}</span>
               </div>
             )}
             <div className="flex gap-2 items-end">
