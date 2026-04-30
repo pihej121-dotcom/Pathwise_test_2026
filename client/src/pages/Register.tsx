@@ -15,6 +15,8 @@ import { Logo } from "@/components/Logo";
 import { ArrowLeft } from "lucide-react";
 
 export default function Register() {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string>("");
@@ -27,7 +29,7 @@ export default function Register() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!firstName || !email || !password) return;
 
     try {
       setError("");
@@ -37,6 +39,8 @@ export default function Register() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          firstName,
+          lastName,
           email,
           password,
           confirmPassword: password,
@@ -106,6 +110,30 @@ export default function Register() {
                 </Alert>
               )}
 
+              <div className="flex gap-2">
+                <div className="space-y-2 flex-1">
+                  <Label htmlFor="firstName">First name</Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="Jane"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2 flex-1">
+                  <Label htmlFor="lastName">Last name</Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -134,7 +162,7 @@ export default function Register() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isSubmitting || !email || !password}
+                disabled={isSubmitting || !firstName || !email || !password}
               >
                 {isSubmitting ? "Creating account…" : "Create account"}
               </Button>

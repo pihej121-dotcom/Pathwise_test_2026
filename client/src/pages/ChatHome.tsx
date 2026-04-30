@@ -629,22 +629,37 @@ After all projects, add a brief **Encouraging Closing Note**.`;
             {/* Logged-in: stats row */}
             {user && (
               <div className="w-full max-w-xl flex flex-wrap gap-3">
-                {/* Resume score card */}
-                {activeResume?.rmsScore != null && (
-                  <div className="flex-1 min-w-[130px] bg-card border border-border/60 rounded-xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-                      <TrendingUp className="w-3.5 h-3.5 text-primary" />
-                      Resume Score
-                    </div>
-                    <p className="text-2xl font-bold text-primary leading-tight">{activeResume.rmsScore}<span className="text-sm font-normal text-muted-foreground">/100</span></p>
-                    <button
-                      onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}
-                      className="text-xs text-primary/70 hover:text-primary mt-0.5 transition-colors"
-                    >
-                      Improve score →
-                    </button>
+                {/* Resume score card — always shown */}
+                <div className="flex-1 min-w-[130px] bg-card border border-border/60 rounded-xl p-4">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                    Resume Score
                   </div>
-                )}
+                  {activeResume?.rmsScore != null ? (
+                    <>
+                      <p className="text-2xl font-bold text-primary leading-tight">
+                        {activeResume.rmsScore}
+                        <span className="text-sm font-normal text-muted-foreground">/100</span>
+                      </p>
+                      <button
+                        onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}
+                        className="text-xs text-primary/70 hover:text-primary mt-0.5 transition-colors"
+                      >
+                        Improve score →
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-lg font-semibold text-muted-foreground leading-tight">—</p>
+                      <button
+                        onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}
+                        className="text-xs text-primary/70 hover:text-primary mt-0.5 transition-colors"
+                      >
+                        Get your score →
+                      </button>
+                    </>
+                  )}
+                </div>
 
                 {/* Analyses count */}
                 {resumeHistory && resumeHistory.length > 0 && (
