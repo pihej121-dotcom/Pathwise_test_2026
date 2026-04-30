@@ -92,7 +92,7 @@ function RoleBasedHome() {
     return <AdminDashboard />;
   }
   
-  return <Dashboard />;
+  return <ChatHome />;
 }
 
 function PublicRoute({ component: Component }: { component: () => JSX.Element }) {
