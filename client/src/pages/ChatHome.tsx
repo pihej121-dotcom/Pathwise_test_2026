@@ -260,15 +260,16 @@ Use **bold** for key terms and important points.
 Be specific, honest, and personalized. ONLY reference the company, role, and details explicitly provided by the user.
 DO NOT assume or invent details about companies or roles that weren't mentioned. If the user provided a job URL but you cannot access it, ask them to paste the job description text instead.
 
-IMPORTANT — Resources: Whenever you mention a course, book, tool, or learning resource, ALWAYS include the real URL as a clickable link in parentheses immediately after the resource name. Use this format: [Resource Name](https://actual-url.com)
+IMPORTANT — Resources: Whenever you mention a course, book, tool, dataset, GitHub repo, or learning resource, ALWAYS include the real URL as a clickable markdown link immediately after the resource name. Use this format: [Resource Name](https://actual-url.com)
 Examples:
-- "Introduction to Machine Learning" on Coursera (https://www.coursera.org/learn/machine-learning)
-- "Python for Everybody" on Coursera (https://www.coursera.org/specializations/python)
-- "CS50" on edX (https://www.edx.org/learn/computer-science/harvard-university-cs50-s-introduction-to-computer-science)
-- LeetCode (https://leetcode.com)
-- freeCodeCamp (https://www.freecodecamp.org)
-- Khan Academy (https://www.khanacademy.org)
-- Kaggle (https://www.kaggle.com)
+- [Introduction to Machine Learning](https://www.coursera.org/learn/machine-learning) on Coursera
+- [Python for Everybody](https://www.coursera.org/specializations/python) on Coursera
+- [CS50](https://www.edx.org/learn/computer-science/harvard-university-cs50-s-introduction-to-computer-science) on edX
+- [LeetCode](https://leetcode.com)
+- [freeCodeCamp](https://www.freecodecamp.org)
+- [Kaggle Datasets](https://www.kaggle.com/datasets)
+- [UCI ML Repository](https://archive.ics.uci.edu/datasets)
+For project recommendations specifically, ALWAYS include: direct dataset links (Kaggle, UCI, government open data), tutorial links (YouTube, Coursera, edX, freeCodeCamp), and GitHub starter repo links.
 Only include URLs you are highly confident are correct and real. If unsure about a URL, write the resource name without a link rather than providing a wrong URL.
 
 IMPORTANT — Projects: Whenever you reference a project someone should complete (e.g. "build a portfolio project", "complete a machine learning project", "create a web app"), end that sentence or bullet with the tag [MICRO_PROJECT: <short project title>] so the system can auto-generate it.
@@ -319,11 +320,34 @@ For each phase: key tasks, skills to develop, milestones, and resources. End wit
 4. Common mistakes to avoid
 5. Confidence-building closing note`;
       } else if (goal === "projects") {
-        userPrompt += `\n\nPlease provide:
-1. 3–5 specific project ideas tailored to their background and goals
-2. For each: title, what to build, skills demonstrated, estimated time
-3. Tips for showcasing these projects
-4. Encouraging closing note`;
+        userPrompt += `\n\nPlease provide 3–5 specific, actionable portfolio project ideas tailored to their background and goals.
+
+For EACH project, include ALL of the following sections using this exact format:
+
+### [Project Number]. [Project Title]
+**What to Build:** [1–2 sentence description]
+**Skills Demonstrated:** [comma-separated list]
+**Estimated Time:** [X–Y weeks]
+
+**📦 Datasets / APIs to Use:**
+- [Resource Name](URL) — [one-line description]
+- [Resource Name](URL) — [one-line description]
+
+**📚 Tutorials & Courses:**
+- [Tutorial/Course Name](URL) — [platform, e.g. YouTube / Coursera / freeCodeCamp]
+- [Tutorial/Course Name](URL) — [platform]
+
+**💻 GitHub Examples & Starter Code:**
+- [Repo Name](GitHub URL) — [one-line description]
+- [Repo Name](GitHub URL) — [one-line description]
+
+**🚀 How to Showcase It:**
+- [specific tip]
+- [specific tip]
+
+IMPORTANT: Every URL must be real and functional. Only include links you are highly confident exist. For datasets, prefer Kaggle, UCI ML Repository, government open data, or well-known APIs. For tutorials, prefer official YouTube channels (Sentdex, Corey Schafer, Tech With Tim, Traversy Media, etc.) or major platforms (Coursera, edX, freeCodeCamp). For GitHub repos, use well-known repositories with many stars.
+
+After all projects, add a brief **Encouraging Closing Note**.`;
       } else {
         userPrompt += `\n\nPlease provide:
 1. A clear, honest assessment of their situation
