@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,8 @@ import {
   Loader2,
   X,
   Link2,
+  ExternalLink,
+  FolderOpen,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
@@ -184,7 +186,7 @@ export default function ChatHome() {
     if (data.goal === "competitiveness") {
       setState("job_details");
       await simulateAssistantReply(
-        "One more thing — to give you an accurate competitiveness analysis, I need the specific job details.\n\nPlease paste:\n• The job posting URL, OR\n• The qualifications and responsibilities from the posting\n\nThis lets me match your profile directly against what the employer is looking for."
+        "One more thing — to give you an accurate competitiveness analysis, I need the actual job requirements.\n\n**Best option:** Paste the qualifications and responsibilities text directly from the job posting.\n\n**Also works:** Paste the job URL (note: I'll do my best but may ask you to copy/paste the text if I can't access it).\n\nThe more detail you give me, the more precise my analysis will be."
       );
     } else {
       await generateAnalysis({ ...data, resumeText });
@@ -224,8 +226,25 @@ export default function ChatHome() {
 
       const systemPrompt = `You are Pathwise, an expert career guidance AI for students and early-career professionals.
 Your tone is warm, encouraging, clear, and actionable.
-Format your response using clear markdown sections with ## headers.
-Be specific, honest, and personalized. Avoid generic advice — reference the user's actual situation.`;
+Format your response using markdown with ## headers for sections, numbered lists, and bullet points.
+Use **bold** for key terms and important points.
+Be specific, honest, and personalized. ONLY reference the company, role, and details explicitly provided by the user.
+DO NOT assume or invent details about companies or roles that weren't mentioned. If the user provided a job URL but you cannot access it, ask them to paste the job description text instead.
+
+IMPORTANT — Resources: Whenever you mention a course, book, tool, or learning resource, ALWAYS include the real URL as a clickable link in parentheses immediately after the resource name. Use this format: [Resource Name](https://actual-url.com)
+Examples:
+- "Introduction to Machine Learning" on Coursera (https://www.coursera.org/learn/machine-learning)
+- "Python for Everybody" on Coursera (https://www.coursera.org/specializations/python)
+- "CS50" on edX (https://www.edx.org/learn/computer-science/harvard-university-cs50-s-introduction-to-computer-science)
+- LeetCode (https://leetcode.com)
+- freeCodeCamp (https://www.freecodecamp.org)
+- Khan Academy (https://www.khanacademy.org)
+- Kaggle (https://www.kaggle.com)
+Only include URLs you are highly confident are correct and real. If unsure about a URL, write the resource name without a link rather than providing a wrong URL.
+
+IMPORTANT — Projects: Whenever you reference a project someone should complete (e.g. "build a portfolio project", "complete a machine learning project", "create a web app"), end that sentence or bullet with the tag [MICRO_PROJECT: <short project title>] so the system can auto-generate it.
+Example: "Complete at least two projects that involve building and training ML models [MICRO_PROJECT: ML Model Training Project]"`;
+
 
       let userPrompt = `Goal: ${goalLabel}
 
@@ -238,7 +257,8 @@ Resume:
 ${finalData.resumeText || "Not provided — give advice based on profile details only."}`;
 
       if (finalData.jobDetails) {
-        userPrompt += `\n\nJob Posting / Requirements:\n${finalData.jobDetails}`;
+        const isUrl = finalData.jobDetails.trim().startsWith("http");
+        userPrompt += `\n\nJob Posting / Requirements (${isUrl ? "URL provided — analyze based on the URL context if possible, otherwise ask for text" : "text provided"}):\n${finalData.jobDetails}`;
       }
 
       if (goal === "competitiveness") {
@@ -466,10 +486,10 @@ For each phase: key tasks, skills to develop, milestones, and resources. End wit
                   )}
                 </div>
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={`max-w-[88%] rounded-2xl text-sm leading-relaxed ${
                     msg.role === "assistant"
-                      ? "bg-card border border-border/50 text-foreground rounded-tl-sm"
-                      : "bg-primary text-primary-foreground rounded-tr-sm"
+                      ? "bg-card border border-border/60 text-foreground rounded-tl-sm shadow-sm px-5 py-4"
+                      : "bg-primary text-primary-foreground rounded-tr-sm px-4 py-2.5"
                   }`}
                 >
                   <MessageContent content={msg.content} />
@@ -561,7 +581,7 @@ For each phase: key tasks, skills to develop, milestones, and resources. End wit
             {state === "job_details" && (
               <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Link2 className="w-3.5 h-3.5 flex-shrink-0" />
-                Paste a job posting URL or the qualifications and responsibilities
+                Paste the job description text <span className="font-medium text-foreground">(recommended)</span> or a job URL
               </div>
             )}
             <div className="flex gap-2 items-end">
@@ -608,44 +628,211 @@ For each phase: key tasks, skills to develop, milestones, and resources. End wit
   );
 }
 
-function MessageContent({ content }: { content: string }) {
-  const lines = content.split("\n");
+function InlineText({ text }: { text: string }) {
+  // Parse markdown links [text](url), **bold**, *italic*, `code`, and bare URLs
+  const parts: React.ReactNode[] = [];
+  // Order: markdown links first, then bold, italic, code, bare URLs
+  const regex = /(\[(.+?)\]\((https?:\/\/[^\s)]+)\)|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|(https?:\/\/[^\s,)"'<>]+))/g;
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    if (match[2] && match[3]) {
+      // Markdown link [text](url)
+      parts.push(
+        <a
+          key={key++}
+          href={match[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-0.5 text-primary underline underline-offset-2 hover:opacity-80 font-medium"
+        >
+          {match[2]}
+          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+        </a>
+      );
+    } else if (match[4]) {
+      parts.push(<strong key={key++} className="font-semibold text-foreground">{match[4]}</strong>);
+    } else if (match[5]) {
+      parts.push(<em key={key++} className="italic">{match[5]}</em>);
+    } else if (match[6]) {
+      parts.push(<code key={key++} className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{match[6]}</code>);
+    } else if (match[7]) {
+      // Bare URL
+      parts.push(
+        <a
+          key={key++}
+          href={match[7]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-0.5 text-primary underline underline-offset-2 hover:opacity-80 break-all"
+        >
+          {match[7]}
+          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+        </a>
+      );
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return <>{parts}</>;
+}
+
+function MicroProjectButton({ title }: { title: string }) {
+  const [, setLocation] = useLocation();
+  const [generating, setGenerating] = React.useState(false);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      await fetch("/api/micro-projects/generate-from-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetRole: title, count: 1, difficulty: "beginner" }),
+      });
+      setLocation("/micro-projects");
+    } catch {
+      setLocation("/micro-projects");
+    }
+  };
+
   return (
-    <div className="space-y-1">
-      {lines.map((line, i) => {
-        if (line.startsWith("## ")) {
-          return (
-            <p key={i} className="font-semibold text-sm mt-3 first:mt-0 text-foreground">
-              {line.slice(3)}
-            </p>
-          );
-        }
-        if (line.startsWith("### ")) {
-          return (
-            <p key={i} className="font-medium text-sm mt-2 first:mt-0">
-              {line.slice(4)}
-            </p>
-          );
-        }
-        if (line.match(/^[-•]\s/)) {
-          return (
-            <p key={i} className="flex gap-1.5 text-sm">
-              <span className="text-primary mt-0.5 flex-shrink-0">•</span>
-              <span>{line.slice(2)}</span>
-            </p>
-          );
-        }
-        if (line.match(/^\d+\.\s/)) {
-          return <p key={i} className="text-sm pl-1">{line}</p>;
-        }
-        if (line.startsWith("→ ")) {
-          return (
-            <p key={i} className="text-sm pl-2 text-muted-foreground">{line}</p>
-          );
-        }
-        if (line.trim() === "") return <div key={i} className="h-1.5" />;
-        return <p key={i} className="text-sm">{line}</p>;
-      })}
+    <button
+      onClick={handleGenerate}
+      disabled={generating}
+      className="inline-flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium border border-primary/20 transition-colors"
+    >
+      {generating ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : (
+        <FolderOpen className="w-3 h-3" />
+      )}
+      Generate Micro Project: {title}
+    </button>
+  );
+}
+
+function MessageContent({ content }: { content: string }) {
+  // Collect all micro-project tags from full content first
+  const microProjectTags: string[] = [];
+  const microProjectRegex = /\[MICRO_PROJECT:\s*([^\]]+)\]/g;
+  let mpMatch;
+  while ((mpMatch = microProjectRegex.exec(content)) !== null) {
+    microProjectTags.push(mpMatch[1].trim());
+  }
+
+  // Strip MICRO_PROJECT tags from content before rendering
+  const cleanContent = content.replace(/\s*\[MICRO_PROJECT:[^\]]+\]/g, "");
+
+  const lines = cleanContent.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // H2 header — styled as a prominent section title
+    if (line.startsWith("## ")) {
+      elements.push(
+        <div key={i} className="mt-5 mb-2 first:mt-1">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 bg-primary rounded-full flex-shrink-0" />
+            <h3 className="font-bold text-base text-foreground tracking-tight">
+              <InlineText text={line.slice(3)} />
+            </h3>
+          </div>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // H3 header
+    if (line.startsWith("### ")) {
+      elements.push(
+        <p key={i} className="font-semibold text-sm mt-3 mb-1 text-foreground/90">
+          <InlineText text={line.slice(4)} />
+        </p>
+      );
+      i++;
+      continue;
+    }
+
+    // Bullet point
+    if (line.match(/^[-•*]\s/)) {
+      elements.push(
+        <div key={i} className="flex gap-2.5 items-start py-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary/70 flex-shrink-0 mt-[7px]" />
+          <p className="text-sm leading-relaxed">
+            <InlineText text={line.slice(2)} />
+          </p>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Numbered list
+    const numMatch = line.match(/^(\d+)\.\s(.+)/);
+    if (numMatch) {
+      elements.push(
+        <div key={i} className="flex gap-2.5 items-start py-0.5">
+          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
+            {numMatch[1]}
+          </span>
+          <p className="text-sm leading-relaxed flex-1">
+            <InlineText text={numMatch[2]} />
+          </p>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Arrow indicator
+    if (line.startsWith("→ ") || line.startsWith("> ")) {
+      elements.push(
+        <p key={i} className="text-sm pl-3 border-l-2 border-primary/30 text-muted-foreground italic py-0.5">
+          <InlineText text={line.slice(2)} />
+        </p>
+      );
+      i++;
+      continue;
+    }
+
+    // Empty line — spacing
+    if (line.trim() === "") {
+      elements.push(<div key={i} className="h-2" />);
+      i++;
+      continue;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={i} className="text-sm leading-relaxed">
+        <InlineText text={line} />
+      </p>
+    );
+    i++;
+  }
+
+  return (
+    <div className="space-y-0.5">
+      {elements}
+      {microProjectTags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border/40">
+          {microProjectTags.map((title, idx) => (
+            <MicroProjectButton key={idx} title={title} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
