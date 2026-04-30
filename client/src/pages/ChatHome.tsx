@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -30,6 +30,9 @@ import {
   MessageSquare,
   ChevronDown,
   ClipboardList,
+  Clock,
+  RotateCcw,
+  TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
@@ -108,6 +111,44 @@ const STARTER_PROMPTS = [
   "Suggest some portfolio projects for a marketing career",
 ];
 
+const CHAT_HISTORY_KEY = "pathwise_chat_sessions";
+const MAX_SAVED_SESSIONS = 5;
+
+type SavedSession = {
+  id: string;
+  prompt: string;
+  timestamp: number;
+  messages: Message[];
+};
+
+function loadSavedSessions(userId: string): SavedSession[] {
+  try {
+    const raw = localStorage.getItem(`${CHAT_HISTORY_KEY}_${userId}`);
+    if (!raw) return [];
+    return JSON.parse(raw) as SavedSession[];
+  } catch {
+    return [];
+  }
+}
+
+function saveSession(userId: string, prompt: string, messages: Message[]) {
+  try {
+    const sessions = loadSavedSessions(userId);
+    const newSession: SavedSession = {
+      id: Date.now().toString(),
+      prompt,
+      timestamp: Date.now(),
+      messages,
+    };
+    // Prepend and keep only MAX_SAVED_SESSIONS
+    const updated = [newSession, ...sessions].slice(0, MAX_SAVED_SESSIONS);
+    localStorage.setItem(`${CHAT_HISTORY_KEY}_${userId}`, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return [];
+  }
+}
+
 function TypingIndicator() {
   return (
     <div className="flex items-center gap-1 px-4 py-3">
@@ -145,6 +186,15 @@ export default function ChatHome() {
   });
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
+  const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
+  const [currentSessionPrompt, setCurrentSessionPrompt] = useState<string>("");
+
+  // Load saved sessions when user is available
+  useEffect(() => {
+    if (user) {
+      setSavedSessions(loadSavedSessions(user.id));
+    }
+  }, [user?.id]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,10 +230,17 @@ export default function ChatHome() {
     setData((prev) => ({ ...prev, userMessage: text, goal }));
     setState("collecting");
     setQuestionIndex(0);
+    setCurrentSessionPrompt(text);
 
     await simulateAssistantReply(
       `Got it! I can help with that. Let me ask you a couple of quick questions so I can give you a personalized response.\n\n${questions[0].question}`
     );
+  };
+
+  const resumeSession = (session: SavedSession) => {
+    setMessages(session.messages);
+    setCurrentSessionPrompt(session.prompt);
+    setState("complete");
   };
 
   const handleCollectingAnswer = async (text: string) => {
@@ -371,6 +428,15 @@ After all projects, add a brief **Encouraging Closing Note**.`;
         result.analysis || result.message || "Here's your personalized analysis!"
       );
       setState("complete");
+      // Save session to localStorage
+      if (user) {
+        const finalMessages = [
+          ...messages,
+          { id: Date.now().toString(), role: "assistant" as const, content: result.analysis || result.message || "", timestamp: new Date() },
+        ];
+        const updated = saveSession(user.id, currentSessionPrompt || finalData.userMessage, finalMessages);
+        setSavedSessions(updated);
+      }
     } catch (err) {
       setIsTyping(false);
       addMessage(
@@ -432,6 +498,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
     setQuestionIndex(0);
     setIsTyping(false);
     setInputValue("");
+    setCurrentSessionPrompt("");
   };
 
   const showFileUpload = state === "resume_upload";
@@ -559,37 +626,62 @@ After all projects, add a brief **Encouraging Closing Note**.`;
               </p>
             </div>
 
-            {/* Logged-in: recent analysis snapshot */}
-            {user && (activeResume || (resumeHistory && resumeHistory.length > 0)) && (
-              <div className="w-full max-w-xl grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {/* Logged-in: stats row */}
+            {user && (
+              <div className="w-full max-w-xl flex flex-wrap gap-3">
+                {/* Resume score card */}
                 {activeResume?.rmsScore != null && (
-                  <button
-                    onClick={() => navigate("/resume")}
-                    className="group bg-card border border-border/60 rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
-                  >
-                    <p className="text-xs text-muted-foreground mb-1">Resume Score</p>
-                    <p className="text-2xl font-bold text-primary">{activeResume.rmsScore}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">View full analysis →</p>
-                  </button>
+                  <div className="flex-1 min-w-[130px] bg-card border border-border/60 rounded-xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                      Resume Score
+                    </div>
+                    <p className="text-2xl font-bold text-primary leading-tight">{activeResume.rmsScore}<span className="text-sm font-normal text-muted-foreground">/100</span></p>
+                    <button
+                      onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}
+                      className="text-xs text-primary/70 hover:text-primary mt-0.5 transition-colors"
+                    >
+                      Improve score →
+                    </button>
+                  </div>
                 )}
+
+                {/* Analyses count */}
                 {resumeHistory && resumeHistory.length > 0 && (
-                  <button
-                    onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}
-                    className="group bg-card border border-border/60 rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
-                  >
-                    <p className="text-xs text-muted-foreground mb-1">Analyses Run</p>
-                    <p className="text-2xl font-bold text-foreground">{resumeHistory.length}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Analyze again →</p>
-                  </button>
+                  <div className="flex-1 min-w-[130px] bg-card border border-border/60 rounded-xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                      <FileText className="w-3.5 h-3.5 text-primary" />
+                      Analyses Run
+                    </div>
+                    <p className="text-2xl font-bold text-foreground leading-tight">{resumeHistory.length}</p>
+                    <button
+                      onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}
+                      className="text-xs text-primary/70 hover:text-primary mt-0.5 transition-colors"
+                    >
+                      Run again →
+                    </button>
+                  </div>
                 )}
-                <button
-                  onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}
-                  className="group bg-card border border-border/60 rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
-                >
-                  <p className="text-xs text-muted-foreground mb-1">Career Roadmap</p>
-                  <p className="text-sm font-semibold text-foreground mt-1">Build plan</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Start chat →</p>
-                </button>
+
+                {/* Last conversation resume card */}
+                {savedSessions.length > 0 && (
+                  <div className="flex-1 min-w-[160px] bg-card border border-border/60 rounded-xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                      <Clock className="w-3.5 h-3.5 text-primary" />
+                      Last Conversation
+                    </div>
+                    <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug mt-1">
+                      {savedSessions[0].prompt}
+                    </p>
+                    <button
+                      onClick={() => resumeSession(savedSessions[0])}
+                      className="flex items-center gap-1 text-xs text-primary/70 hover:text-primary mt-1.5 transition-colors font-medium"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Resume conversation
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -618,18 +710,47 @@ After all projects, add a brief **Encouraging Closing Note**.`;
               </div>
             )}
 
+            {/* Recent conversations (for logged-in users) OR starter prompts (for guests) */}
             <div className="flex flex-col gap-2 w-full max-w-xl">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ask me anything</p>
-              {STARTER_PROMPTS.map((prompt) => (
-                <button
-                  key={prompt}
-                  onClick={() => handleInitialMessage(prompt)}
-                  className="group text-left px-4 py-3 rounded-xl border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-sm text-muted-foreground hover:text-foreground flex items-center justify-between"
-                >
-                  <span>{prompt}</span>
-                  <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 text-primary transition-all duration-200 flex-shrink-0 ml-2" />
-                </button>
-              ))}
+              {user && savedSessions.length > 0 ? (
+                <>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Recent conversations</p>
+                  {savedSessions.slice(0, 3).map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => resumeSession(session)}
+                      className="group text-left px-4 py-3 rounded-xl border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground group-hover:text-foreground truncate">
+                          {session.prompt}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-muted-foreground/60">
+                          {new Date(session.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        </span>
+                        <RotateCcw className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-primary transition-all duration-200" />
+                      </div>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ask me anything</p>
+                  {STARTER_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => handleInitialMessage(prompt)}
+                      className="group text-left px-4 py-3 rounded-xl border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-sm text-muted-foreground hover:text-foreground flex items-center justify-between"
+                    >
+                      <span>{prompt}</span>
+                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 text-primary transition-all duration-200 flex-shrink-0 ml-2" />
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
 
             {!user && (
@@ -727,15 +848,15 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                       Continue with full AI-powered tools to get scored analysis, career plans, and practice.
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => navigate("/resume")}>
+                      <Button size="sm" onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}>
                         <FileText className="w-3.5 h-3.5 mr-1.5" />
                         Resume Analysis
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => navigate("/roadmap")}>
+                      <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
                         <Route className="w-3.5 h-3.5 mr-1.5" />
                         Career Roadmap
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => navigate("/interview-prep")}>
+                      <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me prepare for an upcoming interview")}>
                         <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
                         Interview Prep
                       </Button>
