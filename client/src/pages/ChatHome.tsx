@@ -2,6 +2,14 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Send,
   Paperclip,
@@ -14,8 +22,17 @@ import {
   Link2,
   ExternalLink,
   FolderOpen,
+  LogOut,
+  FileText,
+  Route,
+  Briefcase,
+  Zap,
+  MessageSquare,
+  ChevronDown,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { Logo } from "@/components/Logo";
 
 type ConversationState =
@@ -102,8 +119,20 @@ function TypingIndicator() {
 }
 
 export default function ChatHome() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [, navigate] = useLocation();
+
+  // Fetch resume analysis history for logged-in users
+  const { data: resumeHistory } = useQuery<any[]>({
+    queryKey: ["/api/resume-analysis-history"],
+    enabled: !!user,
+  });
+
+  // Fetch active resume for score display
+  const { data: activeResume } = useQuery<any>({
+    queryKey: ["/api/resumes/active"],
+    enabled: !!user,
+  });
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -409,9 +438,60 @@ For each phase: key tasks, skills to develop, milestones, and resources. End wit
           </div>
           <div className="flex items-center gap-2">
             {user ? (
-              <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-                Dashboard →
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center gap-2 h-8 px-2">
+                    <Avatar className="w-6 h-6">
+                      <AvatarFallback className="bg-primary/20 text-primary text-[10px] font-semibold">
+                        {`${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium hidden sm:inline max-w-[120px] truncate">
+                      {user.firstName}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/resume")}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Resume Analysis
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/roadmap")}>
+                    <Route className="w-4 h-4 mr-2" />
+                    Career Roadmap
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/jobs")}>
+                    <Briefcase className="w-4 h-4 mr-2" />
+                    Job Matching
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/micro-projects")}>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Micro-Projects
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/interview-prep")}>
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Interview Prep
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/applications")}>
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    Applications
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => { logout(); }}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <>
                 <Link href="/login">
@@ -430,22 +510,93 @@ For each phase: key tasks, skills to develop, milestones, and resources. End wit
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-6 flex flex-col">
         {/* Welcome screen */}
         {state === "idle" && messages.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center py-16 gap-8">
+          <div className="flex-1 flex flex-col items-center justify-center py-12 gap-8">
             <div className="text-center space-y-3">
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium">
                 <Sparkles className="w-4 h-4" />
                 Your AI career assistant
               </div>
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
-                What can I help you with
-                <span className="text-primary"> today?</span>
+                {user ? (
+                  <>
+                    Welcome back,{" "}
+                    <span className="text-primary">{user.firstName}</span> 👋
+                  </>
+                ) : (
+                  <>
+                    What can I help you with
+                    <span className="text-primary"> today?</span>
+                  </>
+                )}
               </h1>
               <p className="text-muted-foreground text-base max-w-md mx-auto">
-                Describe what you need in your own words — I'll guide you through a personalized conversation and deliver actionable results.
+                {user
+                  ? "Pick up where you left off or start a new conversation."
+                  : "Describe what you need in your own words — I'll guide you through a personalized conversation and deliver actionable results."}
               </p>
             </div>
 
+            {/* Logged-in: recent analysis snapshot */}
+            {user && (activeResume || (resumeHistory && resumeHistory.length > 0)) && (
+              <div className="w-full max-w-xl grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {activeResume?.rmsScore != null && (
+                  <button
+                    onClick={() => navigate("/resume")}
+                    className="group bg-card border border-border/60 rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
+                  >
+                    <p className="text-xs text-muted-foreground mb-1">Resume Score</p>
+                    <p className="text-2xl font-bold text-primary">{activeResume.rmsScore}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">View full analysis →</p>
+                  </button>
+                )}
+                {resumeHistory && resumeHistory.length > 0 && (
+                  <button
+                    onClick={() => navigate("/resume")}
+                    className="group bg-card border border-border/60 rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
+                  >
+                    <p className="text-xs text-muted-foreground mb-1">Analyses Run</p>
+                    <p className="text-2xl font-bold text-foreground">{resumeHistory.length}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">See history →</p>
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate("/roadmap")}
+                  className="group bg-card border border-border/60 rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
+                >
+                  <p className="text-xs text-muted-foreground mb-1">Career Roadmap</p>
+                  <p className="text-sm font-semibold text-foreground mt-1">View plan</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Open tool →</p>
+                </button>
+              </div>
+            )}
+
+            {/* Quick access tools for logged-in users */}
+            {user && (
+              <div className="w-full max-w-xl">
+                <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">Quick tools</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "Resume Analysis", href: "/resume", icon: FileText },
+                    { label: "Job Matching", href: "/jobs", icon: Briefcase },
+                    { label: "Career Roadmap", href: "/roadmap", icon: Route },
+                    { label: "Interview Prep", href: "/interview-prep", icon: MessageSquare },
+                    { label: "Micro-Projects", href: "/micro-projects", icon: Zap },
+                  ].map(({ label, href, icon: Icon }) => (
+                    <button
+                      key={href}
+                      onClick={() => navigate(href)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 text-xs text-muted-foreground hover:text-foreground transition-all"
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2 w-full max-w-xl">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ask me anything</p>
               {STARTER_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
@@ -458,9 +609,11 @@ For each phase: key tasks, skills to develop, milestones, and resources. End wit
               ))}
             </div>
 
-            <p className="text-xs text-muted-foreground/60">
-              No account needed · Powered by GPT-4o
-            </p>
+            {!user && (
+              <p className="text-xs text-muted-foreground/60">
+                No account needed · Powered by GPT-4o
+              </p>
+            )}
           </div>
         )}
 
@@ -531,6 +684,38 @@ For each phase: key tasks, skills to develop, milestones, and resources. End wit
                       <Link href="/login">
                         <Button variant="outline" size="sm">Sign in</Button>
                       </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {state === "complete" && user && (
+              <div className="bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20 rounded-2xl p-5 mt-2">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm text-foreground">
+                      Dive deeper with Pathwise tools
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                      Continue with full AI-powered tools to get scored analysis, career plans, and practice.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => navigate("/resume")}>
+                        <FileText className="w-3.5 h-3.5 mr-1.5" />
+                        Resume Analysis
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate("/roadmap")}>
+                        <Route className="w-3.5 h-3.5 mr-1.5" />
+                        Career Roadmap
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate("/interview-prep")}>
+                        <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                        Interview Prep
+                      </Button>
                     </div>
                   </div>
                 </div>
