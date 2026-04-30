@@ -939,7 +939,7 @@ export class DatabaseStorage implements IStorage {
       .from(resumes)
       .where(and(
         eq(resumes.userId, userId),
-        eq(resumes.analysisHash, analysisHash),
+        sql`${resumes.analysisHash}->>'hash' = ${analysisHash}`,
         eq(resumes.isActive, true)
       ));
     return resume || undefined;
