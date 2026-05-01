@@ -36,6 +36,8 @@ import {
   Clock,
   RotateCcw,
   TrendingUp,
+  Download,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,11 +48,14 @@ type ConversationState =
   | "collecting"
   | "resume_upload"
   | "job_details"
+  | "job_posting"
+  | "generating_match"
+  | "generating_docs"
   | "targeting"
   | "generating"
   | "complete";
 
-type GoalType = "competitiveness" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "general" | null;
+type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "general" | null;
 
 type CollectedData = {
   userMessage: string;
@@ -64,6 +69,9 @@ type CollectedData = {
   targetCompanies: string;
   preferredLocation: string;
   targetingStep: number;
+  // job match documents
+  tailoredResume: string;
+  tailoredCoverLetter: string;
 };
 
 type Message = {
@@ -82,6 +90,10 @@ const RESUME_SCORE_TARGETING_QUESTIONS = [
 ];
 
 const FOLLOW_UP_QUESTIONS: Record<string, { key: string; question: string }[]> = {
+  job_match: [
+    { key: "background", question: "Tell me a bit about yourself — what's your school year (or years of experience), major/field, and university (or current company)?" },
+    { key: "goal", question: "What specific outcome are you hoping for from this analysis?" },
+  ],
   competitiveness: [
     { key: "background", question: "Tell me a bit about your background — what's your current school year, major, and university?" },
     { key: "target", question: "What specific job title or company are you targeting?" },
@@ -116,7 +128,8 @@ const FOLLOW_UP_QUESTIONS: Record<string, { key: string; question: string }[]> =
 
 function detectGoal(message: string): GoalType {
   const lower = message.toLowerCase();
-  if (lower.match(/competi|job match|qualify|stack up|fit for|apply to|job posting|hiring/)) return "competitiveness";
+  if (lower.match(/job match|match.*job|match.*position|match.*role|fit.*job|qualify.*job|how.*competitive|stack up|apply to|job posting|hiring/)) return "job_match";
+  if (lower.match(/competi|qualify|fit for/)) return "competitiveness";
   if (lower.match(/readiness|ready|career readiness|assess|prepared/)) return "readiness";
   if (lower.match(/roadmap|plan|next steps|action plan|3.?month|6.?month|path/)) return "roadmap";
   if (lower.match(/interview|prep|practice|behav|technical interview|case study/)) return "interview";
@@ -211,6 +224,8 @@ export default function ChatHome() {
     targetCompanies: "",
     preferredLocation: "",
     targetingStep: 0,
+    tailoredResume: "",
+    tailoredCoverLetter: "",
   });
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
@@ -287,9 +302,10 @@ export default function ChatHome() {
       await simulateAssistantReply(questions[nextIndex].question);
     } else {
       setState("resume_upload");
-      await simulateAssistantReply(
-        "Almost there! Please share your resume — upload a file or paste the text directly below.\n\nIf you don't have one ready, just type \"skip\" and I'll do my best with what you've shared."
-      );
+      const resumePrompt = (data.goal === "job_match")
+        ? "Perfect! Now please share your resume — upload a file or paste the text directly below.\n\nAfter your resume, I'll ask for the specific job posting to generate your match score, tailored resume, and cover letter."
+        : "Almost there! Please share your resume — upload a file or paste the text directly below.\n\nIf you don't have one ready, just type \"skip\" and I'll do my best with what you've shared.";
+      await simulateAssistantReply(resumePrompt);
     }
   };
 
@@ -297,7 +313,12 @@ export default function ChatHome() {
     const resumeText = text.toLowerCase() === "skip" ? "" : text;
     setData((prev) => ({ ...prev, resumeText }));
 
-    if (data.goal === "competitiveness") {
+    if (data.goal === "job_match") {
+      setState("job_posting");
+      await simulateAssistantReply(
+        "Great — I have your resume! Now I need the specific job you're targeting.\n\n**Paste the full job posting** (title, responsibilities, and qualifications) directly below for the most accurate analysis.\n\nYou can also paste a job URL, but pasting the actual text gives a much more precise match score."
+      );
+    } else if (data.goal === "competitiveness") {
       setState("job_details");
       await simulateAssistantReply(
         "One more thing — to give you an accurate competitiveness analysis, I need the actual job requirements.\n\n**Best option:** Paste the qualifications and responsibilities text directly from the job posting.\n\n**Also works:** Paste the job URL (note: I'll do my best but may ask you to copy/paste the text if I can't access it).\n\nThe more detail you give me, the more precise my analysis will be."
@@ -436,6 +457,172 @@ export default function ChatHome() {
     const updatedData = { ...data, jobDetails: text };
     setData(updatedData);
     await generateAnalysis(updatedData);
+  };
+
+  const handleJobPosting = async (text: string) => {
+    if (!text.trim()) {
+      await simulateAssistantReply(
+        "I need the job posting to run an accurate analysis. Please paste the job description text or URL below."
+      );
+      return;
+    }
+    const updatedData = { ...data, jobDetails: text };
+    setData(updatedData);
+    await generateJobMatchAnalysis(updatedData);
+  };
+
+  const generateJobMatchAnalysis = async (finalData: CollectedData) => {
+    setState("generating_match");
+    await simulateAssistantReply(
+      "Perfect, I have everything I need! Analyzing your job match now… ✨",
+      600
+    );
+    setIsTyping(true);
+
+    try {
+      const answersText = Object.entries(finalData.answers)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join("\n");
+
+      const systemPrompt = `You are Pathwise, an expert career guidance AI. You perform deep, structured job match analyses.
+Your tone is warm, honest, and actionable. Format your response using markdown.
+Use **bold** for key terms. Use ## for section headers. Use numbered/bulleted lists.
+
+IMPORTANT — Resources: Whenever you mention a course, tool, or resource to close a gap, ALWAYS include the real URL as a markdown link: [Resource Name](https://url.com)
+Only include URLs you are highly confident are correct. If unsure, omit the URL.`;
+
+      const userPrompt = `Perform a comprehensive Job Match Analysis.
+
+Candidate Background:
+${answersText}
+
+Candidate Resume:
+${finalData.resumeText || "Not provided — analyze based on background details."}
+
+Job Posting:
+${finalData.jobDetails}
+
+Please provide a structured analysis with EXACTLY these sections:
+
+## 📊 Job Match Score
+Give a match score out of 100 (e.g. "78/100") with a 2–3 sentence explanation of what the score means for this candidate.
+
+## ✅ Alignment Breakdown
+List 4–6 specific areas where the candidate's background aligns with the job requirements. Be specific — reference actual requirements from the job posting and corresponding candidate experience.
+
+## 💪 Role-Specific Strengths
+List 3–5 concrete strengths this candidate brings to THIS specific role. Quote or reference actual items from both the resume and job posting.
+
+## ⚠️ Key Gaps to Address
+List 3–5 specific gaps between the candidate's profile and what the job requires. Be honest but constructive. For each gap, note how critical it is (High / Medium / Low priority).
+
+## 🚀 Strategic Next Steps
+Provide 4–6 concrete, prioritized action items to close the gaps and strengthen this application. For each step, include specific resources with real URLs to help close the gap.
+
+## 📝 Application Strategy
+Give 2–3 specific tips for how to position this application (what to emphasize in cover letter, what to address proactively, any concerns to pre-empt).
+
+End with a brief encouraging note about the candidate's prospects for this role.`;
+
+      const response = await fetch("/api/ai/career-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ systemPrompt, userPrompt }),
+      });
+
+      if (!response.ok) throw new Error("Job match analysis failed");
+      const result = await response.json();
+      setIsTyping(false);
+
+      const analysisContent = result.analysis || result.message || "";
+      addMessage("assistant", analysisContent);
+
+      // Now generate the tailored documents
+      await generateTailoredDocuments(finalData, analysisContent);
+    } catch (err) {
+      setIsTyping(false);
+      addMessage(
+        "assistant",
+        "I ran into an issue generating your job match analysis. Please try again in a moment."
+      );
+      setState("complete");
+    }
+  };
+
+  const generateTailoredDocuments = async (finalData: CollectedData, analysisContent: string) => {
+    setState("generating_docs");
+    setIsTyping(true);
+    await new Promise<void>((resolve) => setTimeout(() => {
+      setIsTyping(false);
+      addMessage("assistant", "Now generating your **tailored resume** and **cover letter** for this specific role… ✍️");
+      resolve();
+    }, 800));
+    setIsTyping(true);
+
+    try {
+      const systemPrompt = `You are an expert resume writer and career coach. You create highly tailored, ATS-optimized resumes and compelling cover letters.
+Format output EXACTLY as instructed. Use clean, professional language.`;
+
+      const userPrompt = `Based on the job posting and the candidate's original resume, generate two documents:
+
+ORIGINAL RESUME:
+${finalData.resumeText}
+
+JOB POSTING:
+${finalData.jobDetails}
+
+JOB MATCH ANALYSIS INSIGHTS:
+${analysisContent}
+
+---
+
+Generate BOTH documents below. Use EXACTLY these delimiters:
+
+===TAILORED_RESUME_START===
+[Full tailored resume here — rewrite and reorder the original resume to best match the job posting. Incorporate relevant keywords from the JD. Lead with the most relevant experience. Keep clean formatting with sections: Summary, Experience, Skills, Education. Do NOT invent new experience — only reframe and prioritize existing content.]
+===TAILORED_RESUME_END===
+
+===COVER_LETTER_START===
+[Full cover letter here — 3–4 paragraphs. Opening: hook with enthusiasm for the specific role/company and the strongest alignment. Body: 2 paragraphs highlighting the top 2–3 strongest matches to specific job requirements. Closing: confident call to action. Keep it under 400 words. Professional but warm tone.]
+===COVER_LETTER_END===`;
+
+      const response = await fetch("/api/ai/career-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ systemPrompt, userPrompt }),
+      });
+
+      if (!response.ok) throw new Error("Document generation failed");
+      const result = await response.json();
+      const raw = result.analysis || result.message || "";
+
+      const resumeMatch = raw.match(/===TAILORED_RESUME_START===([\s\S]*?)===TAILORED_RESUME_END===/);
+      const coverMatch = raw.match(/===COVER_LETTER_START===([\s\S]*?)===COVER_LETTER_END===/);
+
+      const tailoredResume = resumeMatch ? resumeMatch[1].trim() : "";
+      const tailoredCoverLetter = coverMatch ? coverMatch[1].trim() : "";
+
+      setData((prev) => ({ ...prev, tailoredResume, tailoredCoverLetter }));
+      setIsTyping(false);
+
+      addMessage(
+        "assistant",
+        `✅ Your tailored documents are ready!\n\n## 📄 What I Created\n\n**Tailored Resume** — Reordered and rewritten to highlight your most relevant experience for this specific role, with job-specific keywords woven in.\n\n**Cover Letter** — A personalized letter addressing the job's key requirements and positioning your strongest selling points.\n\n👇 Use the **Download** buttons below to save both documents.`
+      );
+
+      setState("complete");
+      if (user) {
+        const updated = saveSession(user.id, currentSessionPrompt || finalData.userMessage, messages);
+        setSavedSessions(updated);
+      }
+    } catch (err) {
+      setIsTyping(false);
+      addMessage(
+        "assistant",
+        "I generated your job match analysis above, but ran into an issue creating the tailored documents. Try starting a new conversation to generate them."
+      );
+      setState("complete");
+    }
   };
 
   const generateAnalysis = async (finalData: CollectedData) => {
@@ -603,7 +790,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
 
   const handleSendMessage = async () => {
     const text = inputValue.trim();
-    if (!text || state === "generating") return;
+    if (!text || state === "generating" || state === "generating_match" || state === "generating_docs") return;
     setInputValue("");
 
     if (state === "idle") {
@@ -617,6 +804,9 @@ After all projects, add a brief **Encouraging Closing Note**.`;
     } else if (state === "job_details") {
       addMessage("user", text);
       await handleJobDetails(text);
+    } else if (state === "job_posting") {
+      addMessage("user", text);
+      await handleJobPosting(text);
     } else if (state === "targeting") {
       addMessage("user", text);
       await handleTargetingAnswer(text);
@@ -675,7 +865,14 @@ After all projects, add a brief **Encouraging Closing Note**.`;
       return;
     }
 
-    if (data.goal === "competitiveness") {
+    if (data.goal === "job_match") {
+      const updatedData = { ...data, resumeText };
+      setData(updatedData);
+      setState("job_posting");
+      await simulateAssistantReply(
+        "Got your resume! Now I need the specific job you're targeting.\n\n**Paste the full job posting** (title, responsibilities, and qualifications) directly below for the most accurate analysis.\n\nPasting the actual text gives a much more precise match score than a URL."
+      );
+    } else if (data.goal === "competitiveness") {
       const updatedData = { ...data, resumeText };
       setData(updatedData);
       setState("job_details");
@@ -703,11 +900,23 @@ After all projects, add a brief **Encouraging Closing Note**.`;
   const resetChat = () => {
     setMessages([]);
     setState("idle");
-    setData({ userMessage: "", goal: null, answers: {}, resumeText: "", jobDetails: "", targetRole: "", targetIndustry: "", targetCompanies: "", preferredLocation: "", targetingStep: 0 });
+    setData({ userMessage: "", goal: null, answers: {}, resumeText: "", jobDetails: "", targetRole: "", targetIndustry: "", targetCompanies: "", preferredLocation: "", targetingStep: 0, tailoredResume: "", tailoredCoverLetter: "" });
     setQuestionIndex(0);
     setIsTyping(false);
     setInputValue("");
     setCurrentSessionPrompt("");
+  };
+
+  const downloadTextFile = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const showFileUpload = state === "resume_upload";
@@ -716,6 +925,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
     if (state === "idle") return "Tell me what you need help with…";
     if (state === "resume_upload") return "Paste your resume text, or type \"skip\"…";
     if (state === "job_details") return "Paste the job URL or qualifications/responsibilities…";
+    if (state === "job_posting") return "Paste the full job posting text here (or a URL)…";
     if (state === "targeting") {
       const q = RESUME_SCORE_TARGETING_QUESTIONS[data.targetingStep];
       if (q?.key === "preferredLocation") return "Type your preferred location, or \"skip\"…";
@@ -770,9 +980,9 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                     <Route className="w-4 h-4 mr-2" />
                     Career Roadmap
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me find jobs that match my skills and experience")}>
+                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me find jobs that match my skills and experience — I want a job match score and tailored resume")}>
                     <Briefcase className="w-4 h-4 mr-2" />
-                    Job Matching
+                    Job Match Analysis
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleInitialMessage("Suggest portfolio projects I can build to strengthen my resume")}>
                     <Zap className="w-4 h-4 mr-2" />
@@ -921,7 +1131,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                 <div className="flex flex-wrap gap-2">
                   {[
                     { label: "Resume Analysis", prompt: "Analyze my resume and give me detailed feedback", icon: FileText },
-                    { label: "Job Matching", prompt: "Help me find jobs that match my skills and experience", icon: Briefcase },
+                    { label: "Job Match Analysis", prompt: "Help me find jobs that match my skills and experience — I want a job match score and tailored resume", icon: Briefcase },
                     { label: "Career Roadmap", prompt: "Help me build a career roadmap for my goals", icon: Route },
                     { label: "Interview Prep", prompt: "Help me prepare for an upcoming interview", icon: MessageSquare },
                     { label: "Micro-Projects", prompt: "Suggest portfolio projects I can build to strengthen my resume", icon: Zap },
@@ -1041,23 +1251,64 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-sm text-foreground">
-                      Save your results & unlock full access
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-                      Create a free account to save this analysis, track your goals, and get ongoing guidance.
-                    </p>
-                    <div className="flex gap-2">
-                      <Link href="/register">
-                        <Button size="sm">
-                          Create free account
-                          <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                        </Button>
-                      </Link>
-                      <Link href="/login">
-                        <Button variant="outline" size="sm">Sign in</Button>
-                      </Link>
-                    </div>
+                    {data.tailoredResume && data.tailoredCoverLetter ? (
+                      <>
+                        <p className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          Your tailored documents are ready
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                          Download below. Create a free account to save your analysis and track your applications.
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <Button
+                            size="sm"
+                            onClick={() => downloadTextFile(data.tailoredResume, "Tailored_Resume.txt")}
+                            className="gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Resume
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadTextFile(data.tailoredCoverLetter, "Cover_Letter.txt")}
+                            className="gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Cover Letter
+                          </Button>
+                        </div>
+                        <div className="flex gap-2">
+                          <Link href="/register">
+                            <Button size="sm" variant="outline">
+                              Create free account
+                              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold text-sm text-foreground">
+                          Save your results & unlock full access
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                          Create a free account to save this analysis, track your goals, and get ongoing guidance.
+                        </p>
+                        <div className="flex gap-2">
+                          <Link href="/register">
+                            <Button size="sm">
+                              Create free account
+                              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                            </Button>
+                          </Link>
+                          <Link href="/login">
+                            <Button variant="outline" size="sm">Sign in</Button>
+                          </Link>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1070,26 +1321,72 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-sm text-foreground">
-                      Dive deeper with Pathwise tools
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-                      Continue with full AI-powered tools to get scored analysis, career plans, and practice.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}>
-                        <FileText className="w-3.5 h-3.5 mr-1.5" />
-                        Resume Analysis
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
-                        <Route className="w-3.5 h-3.5 mr-1.5" />
-                        Career Roadmap
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me prepare for an upcoming interview")}>
-                        <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                        Interview Prep
-                      </Button>
-                    </div>
+                    {data.tailoredResume && data.tailoredCoverLetter ? (
+                      <>
+                        <p className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          Your tailored documents are ready to download
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                          Both documents are customized for this specific job posting and ready to use.
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <Button
+                            size="sm"
+                            onClick={() => downloadTextFile(data.tailoredResume, "Tailored_Resume.txt")}
+                            className="gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Resume
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadTextFile(data.tailoredCoverLetter, "Cover_Letter.txt")}
+                            className="gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Cover Letter
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                          Want to explore more tools?
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me prepare for an upcoming interview")}>
+                            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                            Interview Prep
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
+                            <Route className="w-3.5 h-3.5 mr-1.5" />
+                            Career Roadmap
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold text-sm text-foreground">
+                          Dive deeper with Pathwise tools
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                          Continue with full AI-powered tools to get scored analysis, career plans, and practice.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}>
+                            <FileText className="w-3.5 h-3.5 mr-1.5" />
+                            Resume Analysis
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
+                            <Route className="w-3.5 h-3.5 mr-1.5" />
+                            Career Roadmap
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me prepare for an upcoming interview")}>
+                            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                            Interview Prep
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1112,7 +1409,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
       </div>
 
       {/* Input area */}
-      {state !== "generating" && state !== "complete" && (
+      {state !== "generating" && state !== "generating_match" && state !== "generating_docs" && state !== "complete" && (
         <div className="sticky bottom-0 bg-background/90 backdrop-blur-sm border-t border-border/50">
           <div className="max-w-3xl mx-auto px-4 py-3">
             {showFileUpload && (
@@ -1140,6 +1437,12 @@ After all projects, add a brief **Encouraging Closing Note**.`;
               <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Link2 className="w-3.5 h-3.5 flex-shrink-0" />
                 Paste the job description text <span className="font-medium text-foreground">(recommended)</span> or a job URL
+              </div>
+            )}
+            {state === "job_posting" && (
+              <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Briefcase className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                <span>Paste the <span className="font-medium text-foreground">full job posting</span> — title, responsibilities, and qualifications — for the most accurate match score</span>
               </div>
             )}
             {state === "targeting" && (
@@ -1180,11 +1483,11 @@ After all projects, add a brief **Encouraging Closing Note**.`;
         </div>
       )}
 
-      {state === "generating" && (
+      {(state === "generating" || state === "generating_match" || state === "generating_docs") && (
         <div className="sticky bottom-0 bg-background/90 backdrop-blur-sm border-t border-border/50">
           <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
-            Generating your personalized analysis…
+            {state === "generating_docs" ? "Generating tailored resume & cover letter…" : "Generating your personalized analysis…"}
           </div>
         </div>
       )}
