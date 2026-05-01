@@ -349,9 +349,13 @@ export default function ChatHome() {
     try {
       if (user) {
         // Authenticated path: call the persist endpoint
+        const authToken = localStorage.getItem("auth_token");
         const response = await fetch("/api/ai/chat-resume-score", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
           credentials: "include",
           body: JSON.stringify({
             resumeText: finalData.resumeText,
