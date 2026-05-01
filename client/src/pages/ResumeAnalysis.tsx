@@ -30,7 +30,14 @@ import {
   ExternalLink,
   Hash,
   Upload,
-  RefreshCw
+  RefreshCw,
+  Clock,
+  Users,
+  Lightbulb,
+  BookOpen,
+  Tag,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
@@ -48,6 +55,15 @@ export default function ResumeAnalysis({ embedded = false }: { embedded?: boolea
   const [targetRole, setTargetRole] = useState("");
   const [targetIndustry, setTargetIndustry] = useState("");
   const [targetCompanies, setTargetCompanies] = useState("");
+  const [expandedGaps, setExpandedGaps] = useState<Set<number>>(new Set());
+
+  const toggleGap = (idx: number) => {
+    setExpandedGaps(prev => {
+      const next = new Set(prev);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      return next;
+    });
+  };
 
   // Check if user has free tier
   const isFreeUser = user?.subscriptionTier === "free";
@@ -326,26 +342,49 @@ export default function ResumeAnalysis({ embedded = false }: { embedded?: boolea
         {/* Active Resume Analysis */}
         {activeResume && (
           <>
-            {/* Overall Score */}
-            <Card className="border-none shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Resume Analysis Results
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-3xl font-semibold" data-testid="overall-score">
-                      {(activeResume as any)?.rmsScore || 0}
-                    </h3>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mt-1">Overall Match Score</p>
-                    <p className="text-xs text-muted-foreground/70 mt-2">
-                      {(activeResume as any)?.createdAt ? format(new Date((activeResume as any).createdAt), "MMM d, yyyy") : 'Unknown'}
-                    </p>
+            {/* Overall Score Hero */}
+            <Card className="border-none shadow-sm bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900/40 dark:to-blue-950/20">
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row md:items-center gap-6">
+                  <div className="flex items-center gap-6">
+                    <div className="relative">
+                      <ProgressRing progress={(activeResume as any)?.rmsScore || 0} size={80} />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Overall Match Score</p>
+                      <h3 className="text-4xl font-bold" data-testid="overall-score">
+                        {(activeResume as any)?.rmsScore || 0}
+                        <span className="text-2xl text-muted-foreground">/100</span>
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {(activeResume as any)?.createdAt ? format(new Date((activeResume as any).createdAt), "MMM d, yyyy") : ''}
+                      </p>
+                    </div>
                   </div>
-                  <ProgressRing progress={(activeResume as any)?.rmsScore || 0} size={64} />
+                  <div className="flex-1 md:border-l md:pl-6 space-y-2">
+                    {(activeResume as any)?.overallInsights?.careerFitAssessment && (
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
+                          <Users className="w-3 h-3" /> Career Fit Assessment
+                        </p>
+                        <p className="text-sm">{(activeResume as any).overallInsights.careerFitAssessment}</p>
+                      </div>
+                    )}
+                    {(activeResume as any)?.overallInsights?.timeToReady && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Clock className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                          Time to competitive: {(activeResume as any).overallInsights.timeToReady}
+                        </span>
+                      </div>
+                    )}
+                    {(activeResume as any)?.overallInsights?.competitivePositioning && (
+                      <div className="flex items-start gap-2 mt-1">
+                        <Target className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground">{(activeResume as any).overallInsights.competitivePositioning}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -380,132 +419,156 @@ export default function ResumeAnalysis({ embedded = false }: { embedded?: boolea
                       </div>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Your resume was analyzed against these target criteria to provide personalized insights.
-                  </p>
                 </CardContent>
               </Card>
             )}
 
-            {/* Category Scores */}
+            {/* Overall Score Explanation + Recommendations */}
+            {(activeResume as any)?.overallInsights && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-500" />
+                      Score Breakdown
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <p className="text-muted-foreground">{(activeResume as any).overallInsights.scoreExplanation}</p>
+                    <Separator />
+                    <div>
+                      <p className="font-medium text-green-700 dark:text-green-400 flex items-center gap-1 mb-1">
+                        <CheckCircle className="w-3.5 h-3.5" /> Key Strengths
+                      </p>
+                      <p className="text-muted-foreground text-xs">{(activeResume as any).overallInsights.strengthsOverview}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1 mb-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> Key Weaknesses
+                      </p>
+                      <p className="text-muted-foreground text-xs">{(activeResume as any).overallInsights.weaknessesOverview}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-yellow-500" />
+                      Top Recommendations
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ol className="space-y-2">
+                      {((activeResume as any).overallInsights.keyRecommendations || []).map((rec: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <span className="text-muted-foreground">{rec}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Section Score Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <Card 
-                className={`cursor-pointer border-none shadow-sm hover:shadow-md transition-all ${selectedSection === 'skills' ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
-                onClick={() => setSelectedSection(selectedSection === 'skills' ? null : 'skills')}
-                data-testid="card-skills"
-              >
-                <CardContent className="pt-6 pb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Skills</p>
-                      <p className={`text-xl sm:text-2xl font-semibold ${getScoreColor((activeResume as any)?.skillsScore || 0)}`}>
-                        {(activeResume as any)?.skillsScore || 0}
-                      </p>
+              {[
+                { key: 'skills', label: 'Skills', icon: <Target className="w-4 h-4" />, score: (activeResume as any)?.skillsScore || 0 },
+                { key: 'experience', label: 'Experience', icon: <Briefcase className="w-4 h-4" />, score: (activeResume as any)?.experienceScore || 0 },
+                { key: 'education', label: 'Education', icon: <GraduationCap className="w-4 h-4" />, score: (activeResume as any)?.educationScore || 0 },
+                { key: 'keywords', label: 'Keywords', icon: <Hash className="w-4 h-4" />, score: (activeResume as any)?.keywordsScore || 0 },
+              ].map(({ key, label, icon, score }) => (
+                <Card 
+                  key={key}
+                  className={`cursor-pointer border-none shadow-sm hover:shadow-md transition-all ${selectedSection === key ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
+                  onClick={() => setSelectedSection(selectedSection === key ? null : key)}
+                  data-testid={`card-${key}`}
+                >
+                  <CardContent className="pt-6 pb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
+                        <p className={`text-xl sm:text-2xl font-semibold ${getScoreColor(score)}`}>{score}</p>
+                      </div>
+                      <div className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center ${getScoreBgColor(score)}`}>
+                        {icon}
+                      </div>
                     </div>
-                    <div className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center ${getScoreBgColor((activeResume as any)?.skillsScore || 0)}`}>
-                      <Target className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <Progress value={(activeResume as any)?.skillsScore || 0} className="h-1.5" />
-                </CardContent>
-              </Card>
-
-              <Card 
-                className={`cursor-pointer border-none shadow-sm hover:shadow-md transition-all ${selectedSection === 'experience' ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
-                onClick={() => setSelectedSection(selectedSection === 'experience' ? null : 'experience')}
-                data-testid="card-experience"
-              >
-                <CardContent className="pt-6 pb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Experience</p>
-                      <p className={`text-xl sm:text-2xl font-semibold ${getScoreColor((activeResume as any)?.experienceScore || 0)}`}>
-                        {(activeResume as any)?.experienceScore || 0}
-                      </p>
-                    </div>
-                    <div className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center ${getScoreBgColor((activeResume as any)?.experienceScore || 0)}`}>
-                      <Briefcase className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <Progress value={(activeResume as any)?.experienceScore || 0} className="h-1.5" />
-                </CardContent>
-              </Card>
-
-              <Card 
-                className={`cursor-pointer border-none shadow-sm hover:shadow-md transition-all ${selectedSection === 'education' ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
-                onClick={() => setSelectedSection(selectedSection === 'education' ? null : 'education')}
-                data-testid="card-education"
-              >
-                <CardContent className="pt-6 pb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Education</p>
-                      <p className={`text-xl sm:text-2xl font-semibold ${getScoreColor((activeResume as any)?.educationScore || 0)}`}>
-                        {(activeResume as any)?.educationScore || 0}
-                      </p>
-                    </div>
-                    <div className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center ${getScoreBgColor((activeResume as any)?.educationScore || 0)}`}>
-                      <GraduationCap className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <Progress value={(activeResume as any)?.educationScore || 0} className="h-1.5" />
-                </CardContent>
-              </Card>
-
-              <Card 
-                className={`cursor-pointer border-none shadow-sm hover:shadow-md transition-all ${selectedSection === 'keywords' ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
-                onClick={() => setSelectedSection(selectedSection === 'keywords' ? null : 'keywords')}
-                data-testid="card-keywords"
-              >
-                <CardContent className="pt-6 pb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Keywords</p>
-                      <p className={`text-xl sm:text-2xl font-semibold ${getScoreColor((activeResume as any)?.keywordsScore || 0)}`}>
-                        {(activeResume as any)?.keywordsScore || 0}
-                      </p>
-                    </div>
-                    <div className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center ${getScoreBgColor((activeResume as any)?.keywordsScore || 0)}`}>
-                      <Hash className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <Progress value={(activeResume as any)?.keywordsScore || 0} className="h-1.5" />
-                </CardContent>
-              </Card>
+                    <Progress value={score} className="h-1.5" />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {selectedSection === key ? 'Click to collapse' : 'Click for details'}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
-            {/* Section Details */}
-            {selectedSection && (activeResume as any)?.sectionAnalysis?.[selectedSection] && (
-              <Card className="mt-6 border-none shadow-sm" data-testid="section-details">
+            {/* Detailed Section Analysis */}
+            {selectedSection && (activeResume as any)?.sectionAnalysis?.[selectedSection] && (() => {
+              const sec = (activeResume as any).sectionAnalysis[selectedSection];
+              return (
+                <Card className="mt-2 border-none shadow-sm" data-testid="section-details">
                   <CardHeader>
                     <CardTitle className="text-base font-medium flex items-center gap-2 capitalize">
                       {selectedSection === 'skills' && <Target className="w-4 h-4" />}
                       {selectedSection === 'experience' && <Briefcase className="w-4 h-4" />}
                       {selectedSection === 'education' && <GraduationCap className="w-4 h-4" />}
                       {selectedSection === 'keywords' && <Hash className="w-4 h-4" />}
-                      {selectedSection} Analysis
+                      {selectedSection} Deep Dive
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Analysis</p>
-                      <p className="text-base" data-testid="section-explanation">
-                        {(activeResume as any).sectionAnalysis[selectedSection].explanation}
-                      </p>
+                    {/* Explanation */}
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <p className="text-sm" data-testid="section-explanation">{sec.explanation}</p>
                     </div>
+
+                    {/* Keywords specific — present vs missing */}
+                    {selectedSection === 'keywords' && (sec.presentKeywords || sec.missingKeywords) && (
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        {sec.presentKeywords && sec.presentKeywords.length > 0 && (
+                          <div>
+                            <p className="text-xs uppercase tracking-wide font-semibold text-green-700 dark:text-green-400 flex items-center gap-1 mb-2">
+                              <Tag className="w-3.5 h-3.5" /> Keywords Present
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {sec.presentKeywords.map((kw: string, i: number) => (
+                                <Badge key={i} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-xs">{kw}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {sec.missingKeywords && sec.missingKeywords.length > 0 && (
+                          <div>
+                            <p className="text-xs uppercase tracking-wide font-semibold text-red-700 dark:text-red-400 flex items-center gap-1 mb-2">
+                              <Tag className="w-3.5 h-3.5" /> Missing Keywords
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {sec.missingKeywords.map((kw: string, i: number) => (
+                                <Badge key={i} variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 text-xs">{kw}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <Separator />
 
-                    <div className="grid sm:grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid sm:grid-cols-2 gap-6">
                       <div>
                         <div className="flex items-center gap-2 mb-3">
                           <CheckCircle className="w-5 h-5 text-green-600" />
-                          <h4 className="font-semibold">Strengths</h4>
+                          <h4 className="font-semibold text-sm">Strengths ({(sec.strengths || []).length})</h4>
                         </div>
                         <ul className="space-y-2" data-testid="section-strengths">
-                          {(activeResume as any).sectionAnalysis[selectedSection].strengths.map((strength: string, idx: number) => (
-                            <li key={idx} className="text-sm flex items-start gap-2">
-                              <span className="text-green-600 mt-0.5">•</span>
+                          {(sec.strengths || []).map((strength: string, idx: number) => (
+                            <li key={idx} className="text-sm flex items-start gap-2 p-2 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/30">
+                              <span className="text-green-600 mt-0.5 flex-shrink-0">✓</span>
                               <span>{strength}</span>
                             </li>
                           ))}
@@ -515,12 +578,12 @@ export default function ResumeAnalysis({ embedded = false }: { embedded?: boolea
                       <div>
                         <div className="flex items-center gap-2 mb-3">
                           <AlertCircle className="w-5 h-5 text-amber-600" />
-                          <h4 className="font-semibold">Gaps</h4>
+                          <h4 className="font-semibold text-sm">Gaps ({(sec.gaps || []).length})</h4>
                         </div>
                         <ul className="space-y-2" data-testid="section-gaps">
-                          {(activeResume as any).sectionAnalysis[selectedSection].gaps.map((gap: string, idx: number) => (
-                            <li key={idx} className="text-sm flex items-start gap-2">
-                              <span className="text-amber-600 mt-0.5">•</span>
+                          {(sec.gaps || []).map((gap: string, idx: number) => (
+                            <li key={idx} className="text-sm flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+                              <span className="text-amber-600 mt-0.5 flex-shrink-0">!</span>
                               <span>{gap}</span>
                             </li>
                           ))}
@@ -533,95 +596,244 @@ export default function ResumeAnalysis({ embedded = false }: { embedded?: boolea
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <TrendingUp className="w-5 h-5 text-blue-600" />
-                        <h4 className="font-semibold">How to Improve</h4>
+                        <h4 className="font-semibold text-sm">How to Improve</h4>
                       </div>
                       <ul className="space-y-2" data-testid="section-improvements">
-                        {(activeResume as any).sectionAnalysis[selectedSection].improvements.map((improvement: string, idx: number) => (
+                        {(sec.improvements || []).map((improvement: string, idx: number) => (
                           <li key={idx} className="text-sm flex items-start gap-2">
-                            <span className="text-blue-600 mt-0.5">→</span>
+                            <span className="text-blue-600 mt-0.5 font-bold">→</span>
                             <span>{improvement}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
+
+                    {/* Section Resources */}
+                    {sec.resources && sec.resources.length > 0 && (
+                      <>
+                        <Separator />
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <BookOpen className="w-5 h-5 text-purple-600" />
+                            <h4 className="font-semibold text-sm">Recommended Resources to Close These Gaps</h4>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-3">
+                            {sec.resources.map((resource: any, resIdx: number) => (
+                              <div key={resIdx} className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 rounded-lg">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium truncate">{resource.title}</p>
+                                  <p className="text-xs text-muted-foreground">{resource.provider}</p>
+                                  {resource.cost && (
+                                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded mt-1 inline-block">{resource.cost}</span>
+                                  )}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="ml-2 flex-shrink-0"
+                                  onClick={() => window.open(resource.url, '_blank')}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
+              );
+            })()}
+
+            {/* Certifications Score Card */}
+            {(activeResume as any)?.certificationsScore !== undefined && (
+              <Card
+                className={`cursor-pointer border-none shadow-sm hover:shadow-md transition-all ${selectedSection === 'certifications' ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
+                onClick={() => setSelectedSection(selectedSection === 'certifications' ? null : 'certifications')}
+              >
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center ${getScoreBgColor((activeResume as any)?.certificationsScore || 0)}`}>
+                        <Award className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Certifications</p>
+                        <p className={`text-xl font-semibold ${getScoreColor((activeResume as any)?.certificationsScore || 0)}`}>
+                          {(activeResume as any)?.certificationsScore || 0}/100
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-32">
+                        <Progress value={(activeResume as any)?.certificationsScore || 0} className="h-1.5" />
+                      </div>
+                      {selectedSection === 'certifications' ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Improvement Recommendations */}
-            {(activeResume as any)?.gaps && Array.isArray((activeResume as any)?.gaps) && (activeResume as any)?.gaps.length > 0 && (
-              <Card className="border-none shadow-sm">
+            {/* Certifications Detail */}
+            {selectedSection === 'certifications' && (activeResume as any)?.sectionAnalysis?.certifications && (() => {
+              const sec = (activeResume as any).sectionAnalysis.certifications;
+              return (
+                <Card className="border-none shadow-sm" data-testid="section-details-cert">
                   <CardHeader>
                     <CardTitle className="text-base font-medium flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
-                      Improvement Recommendations
+                      <Award className="w-4 h-4" /> Certifications Deep Dive
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {((activeResume as any)?.gaps || []).map((gap: any, index: number) => (
-                        <div 
-                          key={index}
-                          className="p-4 border border-border rounded-lg"
-                          data-testid={`gap-${index}`}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <Badge className={getPriorityColor(gap.priority)}>
-                                  {gap.priority.toUpperCase()}
-                                </Badge>
-                                <span className="font-medium">{gap.category}</span>
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                {gap.rationale}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-sm font-medium text-green-600">
-                                +{gap.impact} points
-                              </span>
-                            </div>
+                  <CardContent className="space-y-6">
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <p className="text-sm">{sec.explanation}</p>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-6">
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                          <h4 className="font-semibold text-sm">Strengths</h4>
+                        </div>
+                        <ul className="space-y-2">
+                          {(sec.strengths || []).map((s: string, i: number) => (
+                            <li key={i} className="text-sm flex items-start gap-2 p-2 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/30">
+                              <span className="text-green-600 flex-shrink-0">✓</span><span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <AlertCircle className="w-5 h-5 text-amber-600" />
+                          <h4 className="font-semibold text-sm">Gaps</h4>
+                        </div>
+                        <ul className="space-y-2">
+                          {(sec.gaps || []).map((g: string, i: number) => (
+                            <li key={i} className="text-sm flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+                              <span className="text-amber-600 flex-shrink-0">!</span><span>{g}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    {sec.resources && sec.resources.length > 0 && (
+                      <>
+                        <Separator />
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <BookOpen className="w-5 h-5 text-purple-600" />
+                            <h4 className="font-semibold text-sm">Resources to Get Certified</h4>
                           </div>
+                          <div className="grid sm:grid-cols-2 gap-3">
+                            {sec.resources.map((resource: any, resIdx: number) => (
+                              <div key={resIdx} className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 rounded-lg">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium truncate">{resource.title}</p>
+                                  <p className="text-xs text-muted-foreground">{resource.provider}</p>
+                                  {resource.cost && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded mt-1 inline-block">{resource.cost}</span>}
+                                </div>
+                                <Button size="sm" variant="outline" className="ml-2 flex-shrink-0" onClick={() => window.open(resource.url, '_blank')}>
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
-                          {gap.resources && gap.resources.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium mb-2">Recommended Resources:</p>
-                              <div className="space-y-2">
-                                {gap.resources.map((resource: any, resIndex: number) => (
-                                  <div 
-                                    key={resIndex}
-                                    className="flex items-center justify-between p-2 bg-muted/30 rounded"
-                                  >
-                                    <div>
-                                      <p className="text-sm font-medium">{resource.title}</p>
-                                      <p className="text-xs text-muted-foreground">{resource.provider}</p>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      {resource.cost && (
-                                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                                          {resource.cost}
-                                        </span>
-                                      )}
+            {/* Gap Action Plan */}
+            {(activeResume as any)?.gaps && Array.isArray((activeResume as any)?.gaps) && (activeResume as any)?.gaps.length > 0 && (
+              <Card className="border-none shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base font-medium flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Gap Closure Action Plan
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    These are the most impactful gaps to close — each comes with curated resources to help you get there.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {((activeResume as any)?.gaps || []).map((gap: any, index: number) => (
+                      <div 
+                        key={index}
+                        className="border border-border rounded-lg overflow-hidden"
+                        data-testid={`gap-${index}`}
+                      >
+                        {/* Gap Header - always visible */}
+                        <button
+                          className="w-full text-left p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                          onClick={() => toggleGap(index)}
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Badge className={getPriorityColor(gap.priority)}>
+                              {gap.priority.toUpperCase()}
+                            </Badge>
+                            <span className="font-medium text-sm truncate">{gap.category}</span>
+                            <span className="text-xs text-green-600 font-medium flex-shrink-0">+{gap.impact} pts</span>
+                          </div>
+                          {expandedGaps.has(index) ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0 ml-2" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 ml-2" />
+                          )}
+                        </button>
+
+                        {/* Gap Expanded Details */}
+                        {expandedGaps.has(index) && (
+                          <div className="px-4 pb-4 border-t border-border/50 bg-muted/10">
+                            <p className="text-sm text-muted-foreground mt-3 mb-4">{gap.rationale}</p>
+                            
+                            {gap.resources && gap.resources.length > 0 && (
+                              <div>
+                                <p className="text-xs uppercase tracking-wide font-semibold text-purple-700 dark:text-purple-400 flex items-center gap-1 mb-3">
+                                  <BookOpen className="w-3.5 h-3.5" /> Resources to Close This Gap
+                                </p>
+                                <div className="grid sm:grid-cols-2 gap-3">
+                                  {gap.resources.map((resource: any, resIndex: number) => (
+                                    <div 
+                                      key={resIndex}
+                                      className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-border rounded-lg shadow-sm"
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium">{resource.title}</p>
+                                        <p className="text-xs text-muted-foreground">{resource.provider}</p>
+                                        {resource.cost && (
+                                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded mt-1 inline-block">
+                                            {resource.cost}
+                                          </span>
+                                        )}
+                                      </div>
                                       <Button 
                                         size="sm" 
                                         variant="outline"
+                                        className="ml-3 flex-shrink-0 gap-1"
                                         onClick={() => window.open(resource.url, '_blank')}
                                         data-testid={`resource-link-${index}-${resIndex}`}
                                       >
+                                        <ExternalLink className="w-3.5 h-3.5" />
                                         View
                                       </Button>
                                     </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
           </>

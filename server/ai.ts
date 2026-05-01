@@ -38,6 +38,10 @@ interface ResumeAnalysis {
     strengthsOverview: string;
     weaknessesOverview: string;
     keyRecommendations: string[];
+    careerFitAssessment?: string;
+    competitivePositioning?: string;
+    salaryRange?: string;
+    timeToReady?: string;
   };
   sectionAnalysis: {
     skills: {
@@ -46,6 +50,7 @@ interface ResumeAnalysis {
       gaps: string[];
       explanation: string;
       improvements: string[];
+      resources?: Array<{ title: string; provider: string; url: string; cost?: string }>;
     };
     experience: {
       score: number;
@@ -53,6 +58,7 @@ interface ResumeAnalysis {
       gaps: string[];
       explanation: string;
       improvements: string[];
+      resources?: Array<{ title: string; provider: string; url: string; cost?: string }>;
     };
     keywords: {
       score: number;
@@ -60,6 +66,9 @@ interface ResumeAnalysis {
       gaps: string[];
       explanation: string;
       improvements: string[];
+      missingKeywords?: string[];
+      presentKeywords?: string[];
+      resources?: Array<{ title: string; provider: string; url: string; cost?: string }>;
     };
     education: {
       score: number;
@@ -67,6 +76,7 @@ interface ResumeAnalysis {
       gaps: string[];
       explanation: string;
       improvements: string[];
+      resources?: Array<{ title: string; provider: string; url: string; cost?: string }>;
     };
     certifications: {
       score: number;
@@ -74,6 +84,7 @@ interface ResumeAnalysis {
       gaps: string[];
       explanation: string;
       improvements: string[];
+      resources?: Array<{ title: string; provider: string; url: string; cost?: string }>;
     };
   };
   gaps: Array<{
@@ -413,183 +424,245 @@ Focus on being brutally honest about competitiveness while providing constructiv
       
       console.log('🔄 Generating new resume analysis (no cache found)');
       
-      const prompt = `Analyze this resume for the target role and provide a JSON response with specific scores, detailed section analysis, and gaps.
+      const prompt = `You are a senior career coach and hiring expert. Perform a DEEP, THOROUGH, COMPREHENSIVE resume analysis. Be brutally honest, highly specific, and provide actionable resources for every gap found.
 
-CRITICAL REQUIREMENTS:
-1. Base ALL gap recommendations on the TARGET ROLE specified below. DO NOT default to Python, Data Analytics, or generic tech skills unless they are specifically relevant to the target role.
-2. MINIMUM 5 SPECIFIC STRENGTHS and MINIMUM 5 SPECIFIC GAPS for each section: Skills, Experience, Keywords, and Education
-3. IF RESUME DOESN'T CHANGE, KEEP THE ANALYSIS CONSISTENT
-4. BE EXTREMELY SPECIFIC - Use exact tool names, version numbers, technologies, certifications, experience levels, job titles, companies, projects
-   - BAD: "Good programming skills" | GOOD: "Proficient in React 18 with Hooks, Context API, and TypeScript for building scalable SPAs"
-   - BAD: "Marketing experience" | GOOD: "3 years managing $500K+ digital ad campaigns across Google Ads, Meta, and LinkedIn with 25% average ROAS improvement"
-   - BAD: "Education in business" | GOOD: "MBA in Strategic Management from Stanford GSB with focus on Digital Transformation and FinTech"
+ANALYSIS REQUIREMENTS:
+1. Base ALL analysis on the TARGET ROLE specified. Be role-specific — no generic advice.
+2. MINIMUM 6 SPECIFIC STRENGTHS and MINIMUM 6 SPECIFIC GAPS per section.
+3. Every gap MUST include 1-2 resource links to close it.
+4. BE EXTREMELY SPECIFIC — reference exact tools, years of experience, technologies, certifications, job titles, metrics.
+5. Write a comprehensive career fit assessment (3-4 sentences) comparing the candidate to an ideal candidate for this role.
+6. Estimate how long until the candidate would be competitive if they act on all recommendations.
+7. KEYWORD SECTION: List specific keywords present in the resume AND specific keywords that are missing but critical for ATS/hiring.
 
-Role-Specific Examples:
-- Marketing Manager → Content Marketing, SEO, Campaign Management, Analytics Tools
-- Mechanical Engineer → CAD, SolidWorks, Manufacturing Processes, Materials Science
-- Teacher → Classroom Management, Curriculum Development, Educational Technology
-- Finance Analyst → Financial Modeling, Excel, Bloomberg, SQL (if relevant)
-
-Resume text:
+Resume Text:
 ${resumeText}
 
-Target Role: ${targetRole}
+Target Role: ${targetRole || 'General Career Development'}
 Target Industry: ${targetIndustry || 'Not specified'}
 Target Companies: ${targetCompanies || 'Not specified'}
 
-Provide analysis in this exact JSON format:
+Return this exact JSON structure (no markdown, no extra text):
 {
-  "rmsScore": 65,
-  "skillsScore": 70,
-  "experienceScore": 60,
-  "keywordsScore": 55,
-  "educationScore": 80,
-  "certificationsScore": 40,
+  "rmsScore": <integer 1-100>,
+  "skillsScore": <integer 1-100>,
+  "experienceScore": <integer 1-100>,
+  "keywordsScore": <integer 1-100>,
+  "educationScore": <integer 1-100>,
+  "certificationsScore": <integer 1-100>,
   "overallInsights": {
-    "scoreExplanation": "Explain the overall score and what it means",
-    "strengthsOverview": "Summary of key strengths",
-    "weaknessesOverview": "Summary of key weaknesses",
-    "keyRecommendations": ["Top recommendation 1", "Top recommendation 2"]
+    "scoreExplanation": "<3-4 sentences explaining the score holistically — what it means, why, and the biggest factors>",
+    "strengthsOverview": "<2-3 sentences summarizing top competitive advantages this candidate has for the target role>",
+    "weaknessesOverview": "<2-3 sentences summarizing the most critical gaps preventing success in the target role>",
+    "careerFitAssessment": "<3-4 sentences comparing this candidate to an ideal candidate for the role — be specific about alignment and misalignment>",
+    "competitivePositioning": "<2 sentences on where this candidate stands vs. typical applicants for this role>",
+    "timeToReady": "<Estimated time to become competitive if all gaps are addressed, e.g., '3-6 months with focused effort'>",
+    "keyRecommendations": [
+      "<Top priority recommendation #1 — specific and actionable>",
+      "<Top priority recommendation #2>",
+      "<Top priority recommendation #3>",
+      "<Top priority recommendation #4>"
+    ]
   },
   "sectionAnalysis": {
     "skills": {
-      "score": 70,
+      "score": <integer 1-100>,
+      "explanation": "<3-4 sentence detailed analysis of how the candidate's skills stack up against what the target role actually requires. Be specific about skill level, gaps, and relevance.>",
       "strengths": [
-        "Proficient in Python 3.10+ with NumPy, Pandas for data analysis pipelines processing 1M+ records daily",
-        "Expert in SQL query optimization achieving 60% faster execution on PostgreSQL 14 databases",
-        "Advanced Excel with Power Query, VBA macros, and dynamic dashboards for C-suite reporting",
-        "Certified AWS Solutions Architect with 2 years deploying scalable cloud infrastructure (EC2, S3, Lambda)",
-        "Fluent in Tableau and Power BI for creating interactive data visualizations viewed by 500+ stakeholders"
+        "<Specific strength 1 — name exact technology/skill and evidence from resume>",
+        "<Specific strength 2>",
+        "<Specific strength 3>",
+        "<Specific strength 4>",
+        "<Specific strength 5>",
+        "<Specific strength 6>"
       ],
       "gaps": [
-        "No experience with Apache Spark or distributed computing frameworks required for big data processing",
-        "Missing R programming skills needed for advanced statistical modeling in this role",
-        "Lacks Snowflake data warehouse expertise listed as preferred qualification",
-        "No certification in Azure (target company uses Azure + AWS hybrid cloud)",
-        "Insufficient machine learning library experience (scikit-learn, TensorFlow) for predictive analytics requirements"
+        "<Specific gap 1 — name exactly what's missing and why it matters for the target role>",
+        "<Specific gap 2>",
+        "<Specific gap 3>",
+        "<Specific gap 4>",
+        "<Specific gap 5>",
+        "<Specific gap 6>"
       ],
-      "explanation": "Detailed explanation of their skills match",
-      "improvements": ["How to improve skill area 1", "How to improve skill area 2"]
+      "improvements": [
+        "<Specific, actionable improvement step 1>",
+        "<Specific improvement step 2>",
+        "<Specific improvement step 3>"
+      ],
+      "resources": [
+        { "title": "<Course/resource to close the biggest skills gap>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free/Paid/Subscription>" },
+        { "title": "<Second resource for a different skills gap>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free/Paid/Subscription>" }
+      ]
     },
     "experience": {
-      "score": 60,
+      "score": <integer 1-100>,
+      "explanation": "<3-4 sentence detailed analysis of how the candidate's work history, depth, and relevance compares to requirements for the target role.>",
       "strengths": [
-        "5 years as Data Analyst at Fortune 500 financial services firm managing $50M+ portfolio analytics",
-        "Led cross-functional team of 8 analysts delivering monthly KPI reports to VP-level stakeholders",
-        "Built automated ETL pipeline reducing manual data processing time by 75% (40 hours to 10 hours weekly)",
-        "Implemented A/B testing framework increasing conversion rates by 18% across 3 product lines",
-        "Mentored 6 junior analysts resulting in 4 internal promotions within 18 months"
+        "<Specific experience strength 1 — reference actual role/company/achievement from resume>",
+        "<Specific experience strength 2>",
+        "<Specific experience strength 3>",
+        "<Specific experience strength 4>",
+        "<Specific experience strength 5>",
+        "<Specific experience strength 6>"
       ],
       "gaps": [
-        "No startup or fast-paced tech environment experience (target company is Series B startup)",
-        "Missing customer-facing analytics experience required for client deliverables",
-        "Lacks experience with real-time data streaming (Kafka, Kinesis) needed for live dashboards",
-        "No international or multi-regional team collaboration experience",
-        "Insufficient experience with Agile/Scrum methodologies used by target team"
+        "<Specific experience gap 1 — what type of experience is missing and why it matters>",
+        "<Specific experience gap 2>",
+        "<Specific experience gap 3>",
+        "<Specific experience gap 4>",
+        "<Specific experience gap 5>",
+        "<Specific experience gap 6>"
       ],
-      "explanation": "Detailed explanation of their experience match",
-      "improvements": ["How to gain experience 1", "How to gain experience 2"]
+      "improvements": [
+        "<How to gain/demonstrate this experience>",
+        "<How to reframe or quantify existing experience better>",
+        "<Specific project or portfolio idea to bridge the gap>"
+      ],
+      "resources": [
+        { "title": "<Resource to build relevant experience or showcase it>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free/Paid>" },
+        { "title": "<Portfolio/project resource>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free>" }
+      ]
     },
     "keywords": {
-      "score": 55,
+      "score": <integer 1-100>,
+      "explanation": "<3-4 sentence analysis of ATS keyword optimization — how well the resume uses industry-relevant language, keyword density, and section-specific terminology.>",
+      "presentKeywords": ["<keyword found in resume 1>", "<keyword 2>", "<keyword 3>", "<keyword 4>", "<keyword 5>", "<keyword 6>", "<keyword 7>", "<keyword 8>"],
+      "missingKeywords": ["<critical missing keyword 1>", "<missing keyword 2>", "<missing keyword 3>", "<missing keyword 4>", "<missing keyword 5>", "<missing keyword 6>", "<missing keyword 7>", "<missing keyword 8>"],
       "strengths": [
-        "Resume includes 'data-driven decision making' and 'stakeholder management' - key ATS keywords",
-        "Uses quantified metrics (75% efficiency gain, $50M portfolio) matching job description language",
-        "Contains industry-specific terms like 'ETL pipeline', 'KPI reporting', 'A/B testing framework'",
-        "Mentions relevant tools by name (PostgreSQL, Tableau, Power BI) matching job requirements",
-        "Includes leadership keywords ('led team of 8', 'mentored analysts') for senior-level positioning"
+        "<Keyword strength 1 — which keywords are used effectively and where>",
+        "<Keyword strength 2>",
+        "<Keyword strength 3>",
+        "<Keyword strength 4>",
+        "<Keyword strength 5>",
+        "<Keyword strength 6>"
       ],
       "gaps": [
-        "Missing 'predictive analytics' and 'forecasting models' keywords appearing 5+ times in job description",
-        "Lacks 'business intelligence' and 'data governance' terminology critical for ATS optimization",
-        "No mention of 'API integration' or 'RESTful services' required for technical skill validation",
-        "Absent 'customer segmentation' and 'churn analysis' keywords specific to target industry",
-        "Missing certification keywords (AWS Certified, Google Analytics, Tableau Desktop Specialist)"
+        "<Missing keyword gap 1 — which keywords are absent and how that hurts ATS/reader>",
+        "<Gap 2>",
+        "<Gap 3>",
+        "<Gap 4>",
+        "<Gap 5>",
+        "<Gap 6>"
       ],
-      "explanation": "Analysis of keyword optimization and ATS compatibility",
-      "improvements": ["Add keyword X to Y section", "Rephrase Z using industry terms"]
+      "improvements": [
+        "<Where to add which keyword>",
+        "<How to rephrase a bullet to include missing terms>",
+        "<ATS optimization tip specific to the target role>"
+      ],
+      "resources": [
+        { "title": "Jobscan - ATS Keyword Optimizer", "provider": "Jobscan", "url": "https://www.jobscan.co/", "cost": "Free trial" },
+        { "title": "LinkedIn Learning - Resume Writing", "provider": "LinkedIn", "url": "https://www.linkedin.com/learning/", "cost": "Subscription" }
+      ]
     },
     "education": {
-      "score": 80,
+      "score": <integer 1-100>,
+      "explanation": "<3-4 sentence analysis of how the candidate's educational background aligns with typical requirements and expectations for the target role and industry.>",
       "strengths": [
-        "Master's in Data Science from UC Berkeley with thesis on machine learning applications in finance",
-        "Bachelor's in Computer Science (GPA 3.8/4.0) with minor in Statistics from Carnegie Mellon",
-        "Completed Stanford Online Machine Learning Specialization (Andrew Ng) - 4.9/5.0 rating",
-        "Google Data Analytics Professional Certificate (2023) - aligns with target company's tech stack",
-        "Relevant coursework: Database Systems, Statistical Modeling, Data Visualization, Cloud Computing"
+        "<Education strength 1 — specific degree, institution, or relevant coursework>",
+        "<Strength 2>",
+        "<Strength 3>",
+        "<Strength 4>",
+        "<Strength 5>",
+        "<Strength 6>"
       ],
       "gaps": [
-        "No MBA or business management degree preferred for senior analytics leadership role",
-        "Missing domain-specific certifications in healthcare analytics (target company is in healthtech)",
-        "Lacks formal training in data ethics and privacy regulations (GDPR, HIPAA) required for compliance",
-        "No certification in specific tools mentioned in job posting (Snowflake SnowPro, dbt certification)",
-        "Insufficient continuing education in AI/LLM technologies emerging in analytics field"
+        "<Education gap 1 — what degree, certification, or coursework is typically expected but missing>",
+        "<Gap 2>",
+        "<Gap 3>",
+        "<Gap 4>",
+        "<Gap 5>",
+        "<Gap 6>"
       ],
-      "explanation": "How education aligns with role requirements",
-      "improvements": ["Consider certification X", "Take course in Y"]
+      "improvements": [
+        "<Specific course or certification to pursue>",
+        "<Online program that would strengthen this section>",
+        "<How to frame existing education better>"
+      ],
+      "resources": [
+        { "title": "<Most relevant online course or degree program for this role>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free/Paid>" },
+        { "title": "<Second recommended educational resource>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free/Paid>" }
+      ]
     },
     "certifications": {
-      "score": 40,
-      "strengths": ["Current certifications they have"],
-      "gaps": ["Important certifications missing"],
-      "explanation": "Analysis of certification requirements",
-      "improvements": ["Get certified in X", "Renew/update Y certification"]
+      "score": <integer 1-100>,
+      "explanation": "<2-3 sentence analysis of certifications held vs. certifications typically expected or valued for the target role.>",
+      "strengths": [
+        "<Certification strength 1 — specific cert and its relevance>",
+        "<Strength 2>",
+        "<Strength 3>"
+      ],
+      "gaps": [
+        "<Missing certification 1 — name the cert and why it matters for the role>",
+        "<Gap 2>",
+        "<Gap 3>",
+        "<Gap 4>"
+      ],
+      "improvements": [
+        "<Specific certification to pursue with timeline>",
+        "<How to prepare for the cert exam>"
+      ],
+      "resources": [
+        { "title": "<Most important certification to get for this role>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Exam cost>" },
+        { "title": "<Prep course for that certification>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free/Paid>" }
+      ]
     }
   },
   "gaps": [
     {
-      "category": "[Role-Specific Skill Gap Based on Target Role]",
+      "category": "<Specific gap category name — e.g., 'Cloud Infrastructure Experience', 'Data Visualization Skills'>",
       "priority": "high",
-      "impact": 15,
-      "rationale": "Explain why this skill is essential for the TARGET ROLE",
+      "impact": <integer 5-20>,
+      "rationale": "<2-3 sentences explaining exactly why this gap exists, why it matters for the target role, and what a competitive candidate would have instead.>",
       "resources": [
-        {
-          "title": "[Course/Resource Name]",
-          "provider": "[Provider Name]",
-          "url": "[Use verified URL from list below]",
-          "cost": "Free with audit option"
-        }
+        { "title": "<Primary resource to close this gap>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free/Paid>" },
+        { "title": "<Secondary resource or alternative path>", "provider": "<Provider>", "url": "<verified URL>", "cost": "<Free/Paid>" }
       ]
     }
   ]
 }
 
-CRITICAL REQUIREMENT: For the "url" field in resources, ONLY provide REAL, VERIFIED URLs to actual courses/resources. Use these verified URLs:
+NOTES ON SCORING:
+- 85-100: Exceptional — top-tier candidate, highly competitive
+- 70-84: Strong — solid candidate with minor gaps
+- 55-69: Moderate — meets some requirements, meaningful gaps
+- 40-54: Weak — significant gaps requiring focused effort
+- Below 40: Major gap — career transition or significant upskilling needed
+- Be honest and realistic — inflated scores don't help the user.
 
-VERIFIED RESOURCE URLS:
-Python:
-- "https://www.coursera.org/specializations/python" (Python for Everybody)
-- "https://www.udemy.com/course/complete-python-bootcamp/" (Complete Python Bootcamp)
-- "https://www.codecademy.com/learn/learn-python-3" (Learn Python 3)
+VERIFIED RESOURCE URLS (use ONLY these or general platform homepages):
+- Coursera Python: https://www.coursera.org/specializations/python
+- Coursera Data Analytics: https://www.coursera.org/professional-certificates/google-data-analytics
+- Coursera Machine Learning: https://www.coursera.org/learn/machine-learning
+- Coursera Project Management: https://www.coursera.org/professional-certificates/google-project-management
+- Coursera Browse: https://www.coursera.org/browse
+- Udemy Python: https://www.udemy.com/course/complete-python-bootcamp/
+- Udemy JavaScript: https://www.udemy.com/course/the-complete-javascript-course/
+- Udemy General: https://www.udemy.com/
+- freeCodeCamp: https://www.freecodecamp.org/
+- Kaggle Learn: https://www.kaggle.com/learn
+- AWS Training: https://aws.amazon.com/training/digital/
+- Azure Training: https://learn.microsoft.com/en-us/training/
+- Google Cloud: https://cloud.google.com/training
+- LinkedIn Learning: https://www.linkedin.com/learning/
+- edX: https://www.edx.org/
+- Khan Academy: https://www.khanacademy.org/
+- PMI Training: https://www.pmi.org/learning/training-development
+- Codecademy: https://www.codecademy.com/
+- Jobscan ATS: https://www.jobscan.co/
+- LeetCode: https://leetcode.com/
+- HackerRank: https://www.hackerrank.com/
+- Glassdoor Interview Prep: https://www.glassdoor.com/Interview/index.htm
+- Udacity: https://www.udacity.com/
+- Pluralsight: https://www.pluralsight.com/
+- MIT OpenCourseWare: https://ocw.mit.edu/
+- Google Digital Garage: https://learndigital.withgoogle.com/digitalgarage
+- HubSpot Academy: https://academy.hubspot.com/
+- Salesforce Trailhead: https://trailhead.salesforce.com/
+- DataCamp: https://www.datacamp.com/
 
-JavaScript/Web Development:
-- "https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures/" (JavaScript Algorithms)
-- "https://www.coursera.org/learn/html-css-javascript-for-web-developers" (Web Development)
-- "https://www.udemy.com/course/the-complete-javascript-course/" (Complete JavaScript)
+NEVER invent URLs. If unsure, use https://www.coursera.org/browse or https://www.linkedin.com/learning/
 
-Data Science/Machine Learning:
-- "https://www.coursera.org/professional-certificates/google-data-analytics" (Google Data Analytics)
-- "https://www.coursera.org/learn/machine-learning" (Stanford Machine Learning)
-- "https://www.kaggle.com/learn" (Kaggle Learn - Free)
-
-Cloud/DevOps:
-- "https://aws.amazon.com/training/digital/" (AWS Training)
-- "https://docs.microsoft.com/en-us/learn/azure/" (Azure Learning)
-- "https://cloud.google.com/training" (Google Cloud Training)
-
-Project Management:
-- "https://www.coursera.org/professional-certificates/google-project-management" (Google Project Management)
-- "https://www.pmi.org/learning/training-development" (PMI Training)
-
-General Career Skills:
-- "https://www.linkedin.com/learning/" (LinkedIn Learning - various topics)
-- "https://www.coursera.org/browse" (Coursera Catalog)
-- "https://www.edx.org/" (edX Courses)
-- "https://www.khanacademy.org/" (Khan Academy - Free)
-
-If the specific skill doesn't match these, use the general platform URLs above. NEVER make up URLs - only use these verified ones.
-
-Be realistic with scores (40-80 range). Focus on identifying actual gaps between the resume and target role requirements.`;
+Provide 5-7 items in the "gaps" array, covering the most impactful deficiencies.`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -604,6 +677,8 @@ Be realistic with scores (40-80 range). Focus on identifying actual gaps between
           }
         ],
         response_format: { type: "json_object" },
+        max_tokens: 4000,
+        temperature: 0.3,
       });
 
       const analysis = JSON.parse(response.choices[0].message.content || "{}");
