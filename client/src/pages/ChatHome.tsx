@@ -363,7 +363,10 @@ export default function ChatHome() {
           }),
         });
 
-        if (!response.ok) throw new Error("Score generation failed");
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(errBody.error || `Score generation failed (${response.status})`);
+        }
         const result = await response.json();
         const score = result.rmsScore;
         setResumeScore(score);
@@ -406,12 +409,21 @@ export default function ChatHome() {
         ]);
         setSavedSessions(updated);
       }
-    } catch (err) {
+    } catch (err: any) {
       setIsTyping(false);
-      addMessage(
-        "assistant",
-        "I had trouble generating your full score. Let me give you some quick feedback instead:\n\n## Quick Resume Tips\n- Quantify your achievements with numbers and metrics\n- Tailor keywords to match your target role and industry\n- Keep it to 1 page (or 2 for 10+ years of experience)\n- Add a strong summary section at the top\n- Highlight relevant skills in a dedicated section\n\nSign in to get your full AI-powered score and track your progress!"
-      );
+      const errMsg = err?.message || "Unknown error";
+      console.error("Resume score error:", errMsg);
+      if (user) {
+        addMessage(
+          "assistant",
+          `❌ I ran into an error while scoring your resume: **${errMsg}**\n\nPlease try again in a moment. If the issue persists, you can also use the full **Resume Analysis** tool from the sidebar for a detailed breakdown.`
+        );
+      } else {
+        addMessage(
+          "assistant",
+          "I had trouble generating your full score. Let me give you some quick feedback instead:\n\n## Quick Resume Tips\n- Quantify your achievements with numbers and metrics\n- Tailor keywords to match your target role and industry\n- Keep it to 1 page (or 2 for 10+ years of experience)\n- Add a strong summary section at the top\n- Highlight relevant skills in a dedicated sections\n\nSign in to get your full AI-powered score and track your progress!"
+        );
+      }
       setState("complete");
     }
   };
