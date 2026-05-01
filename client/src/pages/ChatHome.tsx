@@ -57,6 +57,15 @@ type ConversationState =
 
 type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "general" | null;
 
+type UserProfile = {
+  background: string; // raw answer to the background question
+  schoolYear?: string;
+  yearsOfExperience?: string;
+  major?: string;
+  university?: string;
+  company?: string;
+};
+
 type CollectedData = {
   userMessage: string;
   goal: GoalType;
@@ -232,6 +241,7 @@ export default function ChatHome() {
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [currentSessionPrompt, setCurrentSessionPrompt] = useState<string>("");
   const [resumeScore, setResumeScore] = useState<number | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Load saved sessions when user is available
   useEffect(() => {
@@ -269,16 +279,43 @@ export default function ChatHome() {
   const handleInitialMessage = async (text: string) => {
     addMessage("user", text);
     const goal = detectGoal(text);
-    const questions = FOLLOW_UP_QUESTIONS[goal!] || FOLLOW_UP_QUESTIONS.general;
+    const allQuestions = FOLLOW_UP_QUESTIONS[goal!] || FOLLOW_UP_QUESTIONS.general;
 
-    setData((prev) => ({ ...prev, userMessage: text, goal }));
+    // If we already have user profile, pre-fill the background answer and skip that question
+    let startIndex = 0;
+    let prefilledAnswers: Record<string, string> = {};
+    if (userProfile?.background) {
+      const backgroundQuestion = allQuestions.find((q) => q.key === "background");
+      if (backgroundQuestion) {
+        prefilledAnswers = { background: userProfile.background };
+        startIndex = allQuestions.findIndex((q) => q.key !== "background");
+        if (startIndex === -1) startIndex = allQuestions.length; // all questions are background
+      }
+    }
+
+    setData((prev) => ({ ...prev, userMessage: text, goal, answers: prefilledAnswers }));
     setState("collecting");
-    setQuestionIndex(0);
+    setQuestionIndex(startIndex);
     setCurrentSessionPrompt(text);
 
-    await simulateAssistantReply(
-      `Got it! I can help with that. Let me ask you a couple of quick questions so I can give you a personalized response.\n\n${questions[0].question}`
-    );
+    const remainingQuestions = allQuestions.slice(startIndex);
+
+    if (userProfile?.background && remainingQuestions.length === 0) {
+      // All questions answered (only background was needed) — go straight to resume upload
+      const resumePrompt = (goal === "job_match")
+        ? `Welcome back! I already know your background — ${userProfile.background}.\n\nPlease share your resume — upload a file or paste the text below.\n\nAfter your resume, I'll ask for the specific job posting.`
+        : `Welcome back! I already know your background — ${userProfile.background}.\n\nAlmost there! Please share your resume — upload a file or paste the text below.\n\nIf you don't have one ready, just type "skip".`;
+      setState("resume_upload");
+      await simulateAssistantReply(resumePrompt);
+    } else if (userProfile?.background && remainingQuestions.length > 0) {
+      await simulateAssistantReply(
+        `Welcome back! I already have your background on file *(${userProfile.background})*.\n\n${remainingQuestions[0].question}`
+      );
+    } else {
+      await simulateAssistantReply(
+        `Got it! I can help with that. Let me ask you a couple of quick questions so I can give you a personalized response.\n\n${allQuestions[0].question}`
+      );
+    }
   };
 
   const resumeSession = (session: SavedSession) => {
@@ -294,6 +331,11 @@ export default function ChatHome() {
 
     const newAnswers = { ...data.answers, [currentQ.key]: text };
     setData((prev) => ({ ...prev, answers: newAnswers }));
+
+    // If this was the background question, save it to userProfile for future conversations
+    if (currentQ.key === "background") {
+      setUserProfile((prev) => ({ background: text, ...prev }));
+    }
 
     const nextIndex = questionIndex + 1;
 
@@ -1191,6 +1233,24 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                   ? "Pick up where you left off or start a new conversation."
                   : "Describe what you need in your own words — I'll guide you through a personalized conversation and deliver actionable results."}
               </p>
+
+              {/* Remembered profile chip */}
+              {userProfile?.background && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs text-primary/80 max-w-sm">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                  <span className="truncate">
+                    <span className="font-semibold text-primary">Profile remembered:</span>{" "}
+                    {userProfile.background}
+                  </span>
+                  <button
+                    onClick={() => setUserProfile(null)}
+                    className="flex-shrink-0 ml-1 text-primary/50 hover:text-primary transition-colors"
+                    title="Clear remembered profile"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Logged-in: stats row */}
