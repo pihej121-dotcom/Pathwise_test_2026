@@ -970,32 +970,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                   <div className="px-2 py-1.5">
                     <p className="text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}>
-                    <FileText className="w-4 h-4 mr-2" />
-                    Resume Analysis
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
-                    <Route className="w-4 h-4 mr-2" />
-                    Career Roadmap
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me find jobs that match my skills and experience — I want a job match score and tailored resume")}>
-                    <Briefcase className="w-4 h-4 mr-2" />
-                    Job Match Analysis
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleInitialMessage("Suggest portfolio projects I can build to strengthen my resume")}>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Micro-Projects
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me prepare for an upcoming interview")}>
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Interview Prep
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleInitialMessage("Help me track and manage my job applications")}>
-                    <ClipboardList className="w-4 h-4 mr-2" />
-                    Applications
-                  </DropdownMenuItem>
+                  </div>                
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => { logout(); }}
