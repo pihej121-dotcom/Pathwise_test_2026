@@ -2499,7 +2499,12 @@ Make your recommendations specific, actionable, and data-driven based on the act
         rmsScore: analysis.rmsScore,
         skillsScore: analysis.skillsScore,
         experienceScore: analysis.experienceScore,
+        keywordsScore: analysis.keywordsScore,
+        educationScore: analysis.educationScore,
+        certificationsScore: analysis.certificationsScore,
         overallInsights: analysis.overallInsights,
+        sectionAnalysis: analysis.sectionAnalysis,
+        gaps: analysis.gaps,
       });
     } catch (error) {
       console.error("Chat resume score error:", error);

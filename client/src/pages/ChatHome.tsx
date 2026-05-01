@@ -397,24 +397,192 @@ export default function ChatHome() {
         setResumeScore(score);
 
         const insights = result.overallInsights || {};
-        const scoreExplanation = insights.scoreExplanation || "";
-        const strengths = insights.strengthsOverview || "";
-        const weaknesses = insights.weaknessesOverview || "";
-        const recommendations: string[] = insights.keyRecommendations || [];
+        const sectionAnalysis = result.sectionAnalysis || {};
+        const gaps: any[] = result.gaps || [];
+
+        const skillsScore = result.skillsScore ?? null;
+        const expScore = result.experienceScore ?? null;
+        const kwScore = result.keywordsScore ?? null;
+        const eduScore = result.educationScore ?? null;
+        const certScore = result.certificationsScore ?? null;
 
         setIsTyping(false);
 
-        let msg = `## Your Resume Score: ${score}/100\n\n`;
-        if (scoreExplanation) msg += `${scoreExplanation}\n\n`;
-        if (strengths) msg += `## ✅ Key Strengths\n${strengths}\n\n`;
-        if (weaknesses) msg += `## ⚠️ Areas to Improve\n${weaknesses}\n\n`;
+        // Helper to build a score bar label
+        const scoreBand = (s: number | null) => {
+          if (s === null) return "";
+          if (s >= 85) return "🟢 Exceptional";
+          if (s >= 70) return "🔵 Strong";
+          if (s >= 55) return "🟡 Moderate";
+          if (s >= 40) return "🟠 Needs Work";
+          return "🔴 Critical Gap";
+        };
+
+        let msg = `# 📊 Career Readiness Report\n\n`;
+
+        // ── Overall Score Block ──────────────────────────────────────────────
+        msg += `## Overall Resume Score: **${score}/100** ${scoreBand(score)}\n\n`;
+        if (insights.scoreExplanation) msg += `${insights.scoreExplanation}\n\n`;
+        if (insights.careerFitAssessment) msg += `**Career Fit:** ${insights.careerFitAssessment}\n\n`;
+        if (insights.competitivePositioning) msg += `**Market Position:** ${insights.competitivePositioning}\n\n`;
+        if (insights.timeToReady) msg += `⏱️ **Estimated time to become competitive:** ${insights.timeToReady}\n\n`;
+
+        // ── Section Score Breakdown ──────────────────────────────────────────
+        const sectionRows = [
+          ["🛠️ Skills", skillsScore],
+          ["💼 Experience", expScore],
+          ["🔍 ATS Keywords", kwScore],
+          ["🎓 Education", eduScore],
+          ["📜 Certifications", certScore],
+        ].filter(([, v]) => v !== null) as [string, number][];
+
+        if (sectionRows.length > 0) {
+          msg += `## 📋 Section-by-Section Breakdown\n\n`;
+          sectionRows.forEach(([label, val]) => {
+            msg += `**${label}:** ${val}/100 — ${scoreBand(val)}\n`;
+          });
+          msg += `\n`;
+        }
+
+        // ── Skills Section ────────────────────────────────────────────────────
+        const skills = sectionAnalysis.skills;
+        if (skills) {
+          msg += `## 🛠️ Skills Analysis\n\n`;
+          if (skills.explanation) msg += `${skills.explanation}\n\n`;
+          if (skills.strengths?.length) {
+            msg += `**Strengths:**\n`;
+            skills.strengths.slice(0, 4).forEach((s: string) => { msg += `- ${s}\n`; });
+            msg += `\n`;
+          }
+          if (skills.gaps?.length) {
+            msg += `**Gaps:**\n`;
+            skills.gaps.slice(0, 4).forEach((g: string) => { msg += `- ${g}\n`; });
+            msg += `\n`;
+          }
+          if (skills.improvements?.length) {
+            msg += `**How to improve:**\n`;
+            skills.improvements.slice(0, 3).forEach((imp: string) => { msg += `- ${imp}\n`; });
+            msg += `\n`;
+          }
+          if (skills.resources?.length) {
+            msg += `**Resources:**\n`;
+            skills.resources.slice(0, 2).forEach((r: any) => {
+              msg += `- [${r.title}](${r.url}) — ${r.provider}${r.cost ? ` (${r.cost})` : ""}\n`;
+            });
+            msg += `\n`;
+          }
+        }
+
+        // ── Experience Section ────────────────────────────────────────────────
+        const experience = sectionAnalysis.experience;
+        if (experience) {
+          msg += `## 💼 Experience Analysis\n\n`;
+          if (experience.explanation) msg += `${experience.explanation}\n\n`;
+          if (experience.strengths?.length) {
+            msg += `**Strengths:**\n`;
+            experience.strengths.slice(0, 4).forEach((s: string) => { msg += `- ${s}\n`; });
+            msg += `\n`;
+          }
+          if (experience.gaps?.length) {
+            msg += `**Gaps:**\n`;
+            experience.gaps.slice(0, 4).forEach((g: string) => { msg += `- ${g}\n`; });
+            msg += `\n`;
+          }
+          if (experience.improvements?.length) {
+            msg += `**How to improve:**\n`;
+            experience.improvements.slice(0, 3).forEach((imp: string) => { msg += `- ${imp}\n`; });
+            msg += `\n`;
+          }
+          if (experience.resources?.length) {
+            msg += `**Resources:**\n`;
+            experience.resources.slice(0, 2).forEach((r: any) => {
+              msg += `- [${r.title}](${r.url}) — ${r.provider}${r.cost ? ` (${r.cost})` : ""}\n`;
+            });
+            msg += `\n`;
+          }
+        }
+
+        // ── ATS & Keywords Section ────────────────────────────────────────────
+        const keywords = sectionAnalysis.keywords;
+        if (keywords) {
+          msg += `## 🔍 ATS & Keyword Alignment\n\n`;
+          if (keywords.explanation) msg += `${keywords.explanation}\n\n`;
+          if (keywords.presentKeywords?.length) {
+            msg += `**✅ Keywords present:** ${keywords.presentKeywords.slice(0, 8).join(", ")}\n\n`;
+          }
+          if (keywords.missingKeywords?.length) {
+            msg += `**❌ Critical missing keywords:** ${keywords.missingKeywords.slice(0, 8).join(", ")}\n\n`;
+          }
+          if (keywords.improvements?.length) {
+            msg += `**How to optimize:**\n`;
+            keywords.improvements.slice(0, 3).forEach((imp: string) => { msg += `- ${imp}\n`; });
+            msg += `\n`;
+          }
+          if (keywords.resources?.length) {
+            msg += `**Resources:**\n`;
+            keywords.resources.slice(0, 2).forEach((r: any) => {
+              msg += `- [${r.title}](${r.url}) — ${r.provider}${r.cost ? ` (${r.cost})` : ""}\n`;
+            });
+            msg += `\n`;
+          }
+        }
+
+        // ── Education Section ─────────────────────────────────────────────────
+        const education = sectionAnalysis.education;
+        if (education) {
+          msg += `## 🎓 Education Analysis\n\n`;
+          if (education.explanation) msg += `${education.explanation}\n\n`;
+          if (education.gaps?.length) {
+            msg += `**Gaps to address:**\n`;
+            education.gaps.slice(0, 3).forEach((g: string) => { msg += `- ${g}\n`; });
+            msg += `\n`;
+          }
+          if (education.resources?.length) {
+            msg += `**Recommended learning:**\n`;
+            education.resources.slice(0, 2).forEach((r: any) => {
+              msg += `- [${r.title}](${r.url}) — ${r.provider}${r.cost ? ` (${r.cost})` : ""}\n`;
+            });
+            msg += `\n`;
+          }
+        }
+
+        // ── Top Priority Gaps with Action Plans ────────────────────────────────
+        if (gaps.length > 0) {
+          msg += `## 🚨 Top Priority Gaps & Action Plans\n\n`;
+          const highPriority = gaps.filter((g: any) => g.priority === "high").slice(0, 5);
+          const toShow = highPriority.length > 0 ? highPriority : gaps.slice(0, 5);
+          toShow.forEach((gap: any, i: number) => {
+            msg += `### ${i + 1}. ${gap.category}\n`;
+            if (gap.rationale) msg += `${gap.rationale}\n\n`;
+            if (gap.resources?.length) {
+              msg += `**Close this gap:**\n`;
+              gap.resources.slice(0, 2).forEach((r: any) => {
+                msg += `- [${r.title}](${r.url}) — ${r.provider}${r.cost ? ` (${r.cost})` : ""}\n`;
+              });
+              msg += `\n`;
+            }
+          });
+        }
+
+        // ── Overall Strengths & Weaknesses ────────────────────────────────────
+        if (insights.strengthsOverview) {
+          msg += `## ✅ Competitive Advantages\n\n${insights.strengthsOverview}\n\n`;
+        }
+        if (insights.weaknessesOverview) {
+          msg += `## ⚠️ Critical Weaknesses\n\n${insights.weaknessesOverview}\n\n`;
+        }
+
+        // ── Key Recommendations ───────────────────────────────────────────────
+        const recommendations: string[] = insights.keyRecommendations || [];
         if (recommendations.length > 0) {
-          msg += `## 🚀 Top Recommendations\n`;
+          msg += `## 🚀 Priority Action Plan\n\n`;
           recommendations.forEach((r, i) => {
             msg += `${i + 1}. ${r}\n`;
           });
+          msg += `\n`;
         }
-        msg += `\nYour score has been saved to your profile and will appear on your dashboard.`;
+
+        msg += `---\n📁 Your full analysis has been saved to your profile. Visit the **Resume Analysis** page for an interactive deep-dive with charts and tracking.`;
 
         addMessage("assistant", msg);
       } else {
@@ -1580,6 +1748,19 @@ function MessageContent({ content }: { content: string }) {
   while (i < lines.length) {
     const line = lines[i];
 
+    // H1 header — styled as the main report title
+    if (line.startsWith("# ")) {
+      elements.push(
+        <div key={i} className="mt-2 mb-3 first:mt-0">
+          <h2 className="font-bold text-lg text-foreground tracking-tight flex items-center gap-2">
+            <InlineText text={line.slice(2)} />
+          </h2>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
     // H2 header — styled as a prominent section title
     if (line.startsWith("## ")) {
       elements.push(
@@ -1645,6 +1826,13 @@ function MessageContent({ content }: { content: string }) {
           <InlineText text={line.slice(2)} />
         </p>
       );
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (line.trim() === "---" || line.trim() === "***" || line.trim() === "___") {
+      elements.push(<hr key={i} className="border-border/40 my-3" />);
       i++;
       continue;
     }

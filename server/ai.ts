@@ -677,7 +677,7 @@ Provide 5-7 items in the "gaps" array, covering the most impactful deficiencies.
           }
         ],
         response_format: { type: "json_object" },
-        max_tokens: 4000,
+        max_tokens: 6000,
         temperature: 0.3,
       });
 
