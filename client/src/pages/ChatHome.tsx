@@ -1003,7 +1003,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
             <div className="text-center space-y-3">
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium">
                 <Sparkles className="w-4 h-4" />
-                Your AI career assistant
+                Your Personal Pocket Career Assistant
               </div>
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
                 {user ? (
