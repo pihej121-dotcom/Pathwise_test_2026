@@ -38,6 +38,7 @@ import {
   TrendingUp,
   Download,
   CheckCircle2,
+  DollarSign,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -55,7 +56,7 @@ type ConversationState =
   | "generating"
   | "complete";
 
-type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "general" | null;
+type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "general" | null;
 
 type UserProfile = {
   background: string; // raw answer to the background question
@@ -133,10 +134,24 @@ const FOLLOW_UP_QUESTIONS: Record<string, { key: string; question: string }[]> =
     { key: "background", question: "Tell me a bit about yourself — school year, major, and university?" },
     { key: "goal", question: "What specific outcome are you hoping for from our conversation?" },
   ],
+  salary_negotiation: [
+    { key: "negotiation_type", question: "Great! First, what type of negotiation is this?\n\n**A)** New job offer\n**B)** Promotion or raise at current job\n\nJust reply A or B." },
+    { key: "current_role", question: "What is your current job title and company? (If this is a new offer, describe your most recent or current role.)" },
+    { key: "target_role", question: "What is the target role or title you're negotiating for? (e.g. 'Senior Software Engineer at Stripe' or 'Promotion to VP of Marketing')" },
+    { key: "location", question: "What city/region is this role based in, and is it remote, hybrid, or in-office? (Location affects market rates significantly.)" },
+    { key: "years_experience", question: "How many years of total work experience do you have? And how many years specifically in this type of role or field?" },
+    { key: "current_salary", question: "What is your current base salary (or most recent if you're transitioning)? Include any bonuses or equity if relevant." },
+    { key: "offer_or_desired", question: "What is the offer amount or the salary you're hoping to achieve? (Include base salary, bonus targets, equity, or other compensation if known.)" },
+    { key: "benefits", question: "What benefits or perks are included (or expected)? Think about: health insurance, 401k match, PTO, remote work stipend, signing bonus, equity/RSUs, etc. Type 'skip' if you're focused on base only." },
+    { key: "competing_offers", question: "Do you have any competing offers or outside options? If yes, briefly describe them. If not, type 'none'. (Competing offers are powerful leverage.)" },
+    { key: "performance_or_strengths", question: "What makes your case strong? Examples: recent wins, performance reviews, skills hard to find, certifications, measurable impact, or market data you've researched." },
+    { key: "constraints_deadlines", question: "Are there any constraints or deadlines I should know about? For example: offer expiry date, financial needs, relocation requirements, or anything else that limits your flexibility. Type 'none' if not applicable." },
+  ],
 };
 
 function detectGoal(message: string): GoalType {
   const lower = message.toLowerCase();
+  if (lower.match(/salary|negotiat|raise|promotion|pay|compensation|offer.*negot|counter.?offer|increment|wage|pay.?raise|pay.?increase/)) return "salary_negotiation";
   if (lower.match(/job match|match.*job|match.*position|match.*role|fit.*job|qualify.*job|how.*competitive|stack up|apply to|job posting|hiring/)) return "job_match";
   if (lower.match(/competi|qualify|fit for/)) return "competitiveness";
   if (lower.match(/readiness|ready|career readiness|assess|prepared/)) return "readiness";
@@ -343,11 +358,16 @@ export default function ChatHome() {
       setQuestionIndex(nextIndex);
       await simulateAssistantReply(questions[nextIndex].question);
     } else {
-      setState("resume_upload");
-      const resumePrompt = (data.goal === "job_match")
-        ? "Perfect! Now please share your resume — upload a file or paste the text directly below.\n\nAfter your resume, I'll ask for the specific job posting to generate your match score, tailored resume, and cover letter."
-        : "Almost there! Please share your resume — upload a file or paste the text directly below.\n\nIf you don't have one ready, just type \"skip\" and I'll do my best with what you've shared.";
-      await simulateAssistantReply(resumePrompt);
+      // Salary negotiation doesn't need a resume — go straight to analysis
+      if (data.goal === "salary_negotiation") {
+        await generateAnalysis({ ...data, answers: newAnswers });
+      } else {
+        setState("resume_upload");
+        const resumePrompt = (data.goal === "job_match")
+          ? "Perfect! Now please share your resume — upload a file or paste the text directly below.\n\nAfter your resume, I'll ask for the specific job posting to generate your match score, tailored resume, and cover letter."
+          : "Almost there! Please share your resume — upload a file or paste the text directly below.\n\nIf you don't have one ready, just type \"skip\" and I'll do my best with what you've shared.";
+        await simulateAssistantReply(resumePrompt);
+      }
     }
   };
 
@@ -855,12 +875,13 @@ Generate BOTH documents below. Use EXACTLY these delimiters:
         roadmap: "3–6 Month Career Roadmap",
         interview: "Interview Preparation",
         projects: "Portfolio Project Recommendations",
+        salary_negotiation: "Salary Negotiation Strategy",
         general: "Career Guidance",
       };
 
       const goalLabel = goalDescriptions[goal] || "Career Guidance";
 
-      const systemPrompt = `You are Pathwise, an expert career guidance AI for students and early-career professionals.
+      const systemPrompt = `You are Pathwise, an expert career guidance AI for students, early-career professionals, and experienced professionals navigating career decisions including salary negotiation.
 Your tone is warm, encouraging, clear, and actionable.
 Format your response using markdown with ## headers for sections, numbered lists, and bullet points.
 Use **bold** for key terms and important points.
@@ -955,6 +976,37 @@ For EACH project, include ALL of the following sections using this exact format:
 IMPORTANT: Every URL must be real and functional. Only include links you are highly confident exist. For datasets, prefer Kaggle, UCI ML Repository, government open data, or well-known APIs. For tutorials, prefer official YouTube channels (Sentdex, Corey Schafer, Tech With Tim, Traversy Media, etc.) or major platforms (Coursera, edX, freeCodeCamp). For GitHub repos, use well-known repositories with many stars.
 
 After all projects, add a brief **Encouraging Closing Note**.`;
+      } else if (goal === "salary_negotiation") {
+        userPrompt += `\n\nPlease provide a comprehensive salary negotiation assessment with EXACTLY these sections:
+
+## 🔍 Reality Check
+Before anything else, critically evaluate the user's salary expectations against real market data for their role, experience level, and location. If their desired salary is significantly above market (more than ~20–30% above typical ranges), say so directly and respectfully — e.g., "Asking for $X as a [title] in [city] is well above market and could jeopardize your offer." If their expectations are reasonable or below market, affirm that. Be honest and specific with numbers. Do NOT sugarcoat unrealistic expectations.
+
+## 💰 Negotiation Feasibility
+State clearly whether negotiating is realistic in this situation and why. Rate feasibility as High / Medium / Low.
+
+## 📊 Likelihood of Success
+Give an honest probability estimate (e.g. "70% likely to succeed") with a 2–3 sentence explanation. If the user's desired amount is unrealistic, reflect that honestly (e.g. "20% — the ask is significantly above market for this role and experience level").
+
+## 💪 Leverage Assessment
+Analyze the user's negotiating strength. What cards do they hold? Rate overall leverage as Strong / Moderate / Weak and explain the key factors.
+
+## 🌍 Market Alignment
+Compare BOTH the current offer/salary AND the user's desired salary to real market rates for this role, experience level, and location. Reference realistic ranges from Glassdoor, Levels.fyi, LinkedIn Salary, or Payscale. For each, indicate: Below Market / At Market / Above Market / Significantly Above Market. Be specific with numbers.
+
+## 🎯 Suggested Salary Range
+Provide a realistic recommended ask range grounded in market data. If the user's desired number is unrealistic, do NOT validate it — provide what a credible negotiation range looks like instead. Include what to aim for, the floor, and total comp context (bonuses/equity) if relevant.
+
+## 🗣️ Key Talking Points
+List 4–6 specific, persuasive talking points personalized to this situation. Only include points that are credible given their experience level and market position.
+
+## ⚠️ Risks to Avoid
+List 3–5 mistakes or red flags specific to their situation. If they risk losing the offer by asking for too much, call that out explicitly.
+
+## 📝 Negotiation Script / Email
+Provide a ready-to-use script or email template. If the user's desired amount was unrealistic, use the corrected realistic range in the script instead of their stated figure. Make it professional and personalized. Include placeholders like [Company Name] where needed.
+
+End with a candid, constructive closing note. If their expectations need adjusting, say so kindly but clearly — then be encouraging about what a realistic negotiation can achieve.`;
       } else {
         userPrompt += `\n\nPlease provide:
 1. A clear, honest assessment of their situation
@@ -1338,6 +1390,7 @@ After all projects, add a brief **Encouraging Closing Note**.`;
                     { label: "Career Roadmap", prompt: "Help me build a career roadmap for my goals", icon: Route },
                     { label: "Interview Prep", prompt: "Help me prepare for an upcoming interview", icon: MessageSquare },
                     { label: "Micro-Projects", prompt: "Suggest portfolio projects I can build to strengthen my resume", icon: Zap },
+                    { label: "Salary Negotiation", prompt: "Help me negotiate my salary — I want to understand my leverage and get a negotiation strategy", icon: DollarSign },
                   ].map(({ label, prompt, icon: Icon }) => (
                     <button
                       key={label}
