@@ -1,0 +1,29 @@
+Switch the Niche Networks feature to use a self-hosted SearXNG instance as the search source instead of the Eventbrite API. SearXNG is an open-source metasearch engine. It requires no API key. It runs as a separate service, and our app calls its HTTP endpoint.
+
+How it should work:
+- For each user, build platform-specific search queries from their target role/career interests, their resume gaps, and their location.
+- Run one query per platform using site: filters so results come back already grouped by platform. For example:
+  - site:reddit.com {role} community
+  - site:linkedin.com/groups {role}
+  - site:facebook.com/groups {role}
+  - {role} discord server {city}
+  - {role} slack community
+  - {role} meetup {city}  (for events)
+- Call SearXNG's JSON API: GET {SEARXNG_URL}/search?q={query}&format=json
+- Label each result with the platform it came from, then return results grouped by type: Events, Social Media Groups, Forums & Communities.
+
+Hard requirements:
+- Never invent or guess a URL. Only use real URLs returned by SearXNG. Validate each one (check for a 200 response) before showing it, and drop any that fail.
+- If a category returns no valid results, show nothing for it rather than fabricating entries.
+- Reuse the existing skill-extraction and resume-gap logic already in the app to build the queries. Do not rebuild that analysis.
+
+Configuration:
+- The SearXNG base URL must come from an environment variable (SEARXNG_URL), not hardcoded.
+- Note for me: SearXNG needs the JSON format enabled in its settings.yml (search: formats: includes json), or the API returns 403. Account for this.
+
+Before writing code, report back with:
+1. Your plan for where the SearXNG instance will be hosted, since it's a separate service our app depends on. Tell me the options (e.g. running the Docker image on a host I control) and what I need to do to stand it up.
+2. How you'll structure the per-platform queries and group the results.
+3. Any caveat you foresee, especially that LinkedIn and Facebook group searches tend to return thin results because those platforms block crawlers.
+
+Do not write code until I confirm the plan.
