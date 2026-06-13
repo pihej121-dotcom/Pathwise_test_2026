@@ -2922,9 +2922,17 @@ Make your recommendations specific, actionable, and data-driven based on the act
         return { number: i + 1, question: a.question, transcript: a.transcript, durationSeconds: a.durationSeconds, wordCount, wpm, fillerCounts, totalFillers, longPauses };
       });
 
-      const systemPrompt = `You are an expert interview coach. Provide honest, specific, constructive feedback.
-Format your response using markdown: ## for section headers, **bold** for key terms, - for bullets. Cite evidence from the transcripts.
-Important: This analysis is based on transcript text and timing data only. Do NOT claim to assess tone, vocal energy, confidence, or body language.`;
+      const systemPrompt = `You are a senior interview coach and hiring manager with 15+ years of experience at top-tier companies. Your critiques are honest, detailed, and evidence-based — you cite specific phrases from the transcript.
+
+Your content analysis goes beyond surface-level feedback. For every answer you ask:
+1. Did the candidate actually answer what was asked, or did they pivot to something easier?
+2. Is the claim specific and verifiable (names, numbers, timelines, outcomes) or vague and generic?
+3. Would a skeptical hiring manager find this answer memorable or forgettable?
+4. What is missing that a strong candidate would have included?
+
+Format: Use markdown with ## for section headers, ### for sub-headers, **bold** for key terms, and - for bullets. Quote specific phrases from the transcript in "quotes" when praising or critiquing them. Be direct — do not soften valid criticism with filler praise.
+
+Important: This analysis is based on transcript text and timing data only. Do NOT assess tone, vocal energy, confidence, or body language.`;
 
       const answersSummary = enriched.map(a => `---
 ## Question ${a.number}: "${a.question}"
@@ -2933,39 +2941,77 @@ Filler words: ${a.totalFillers > 0 ? Object.entries(a.fillerCounts).map(([k, v])
 Long pauses (>2s): ${a.longPauses.length > 0 ? a.longPauses.map((p: number) => `${p}s`).join(", ") : "none"}
 Transcript: "${a.transcript || "(no speech detected)"}"`).join("\n\n");
 
-      const userPrompt = `Role being practiced: **${role || "General"}**
+      const userPrompt = `The candidate is practicing for a **${role || "General"}** interview.
 
 ${answersSummary}
 
 ---
 
-For EACH question provide:
+## Instructions
 
-### Q[N] — Content
-- Relevance and completeness
-- Structure (STAR for behavioral; clear steps for technical)
-- Specificity (real examples and numbers vs. vague generalities)
-- Key strength and main gap
-
-### Q[N] — Delivery *(transcript-based)*
-- **Pace:** Comment on WPM (ideal 120–160; <100 slow; >180 rushed). If N/A, note answer was too brief.
-- **Fillers:** Note count and impact (under 3/min is fine; over 5/min is distracting)
-- **Length:** Too short (<60s) / appropriate (60–180s) / rambling (>180s)
-- **Pauses:** Any long pauses noted; thoughtful or hesitant?
+For EACH question, provide the following two sections. Be thorough and evidence-based — quote phrases from the transcript.
 
 ---
 
-After all questions provide:
+### Q[N] — Content Analysis
+
+**1. Answer Accuracy**
+- Did the candidate directly answer the question asked, or did they sidestep it?
+- If they missed the core of the question, state exactly what they failed to address.
+
+**2. Structure & Framework**
+- For behavioral questions: evaluate STAR completeness. Was the Situation clear and concise? Was the Task (their specific responsibility) defined? Were the Actions detailed and in first person ("I did X" not "we did X")? Was the Result quantified or at least clearly stated?
+- For technical questions: did they explain their reasoning step by step? Did they cover edge cases, trade-offs, or alternatives?
+- For situational questions: did they lay out a clear decision process? Did they show awareness of stakeholders, risks, and outcomes?
+- Quote the weakest part of their structure with a brief explanation of why it falls short.
+
+**3. Specificity & Evidence**
+- List any specific details they gave (names, metrics, timeframes, team sizes, technologies, dollar figures). If they gave none, say so explicitly.
+- Identify the single most vague or generic statement in their answer and explain how it would land with a skeptical interviewer.
+- Rate specificity: **Low** (all generalities) / **Medium** (some details, no hard outcomes) / **High** (concrete, verifiable claims).
+
+**4. Role Relevance**
+- How well does the answer demonstrate skills or qualities that matter for a **${role || "this role"}**?
+- Did they miss an opportunity to connect their experience to what interviewers at this level actually care about?
+
+**5. What a Strong Answer Would Add**
+- Give 2–3 concrete, specific things a top-10% candidate would have said that this candidate did not. Be prescriptive — not "add more detail" but "state the business impact in dollars or percentage improvement."
+
+**6. Overall Content Score: X/10**
+- One sentence justifying the score.
+
+---
+
+### Q[N] — Delivery *(transcript-based metrics only)*
+- **Pace:** ${enriched[0]?.wpm > 0 ? "Comment on WPM. Ideal 120–160; <100 is too slow; >180 is rushed." : "Answer too brief to compute WPM reliably."}
+- **Fillers:** Note total count and which words were most frequent. Under 3/min acceptable; 5+/min distracting.
+- **Length:** Flag if too short (<60s — insufficient depth), appropriate (60–180s), or rambling (>180s — needs editing).
+- **Pauses:** Note any gaps >2s. Were they before key points (thoughtful) or mid-sentence (hesitant)?
+
+---
+
+After analyzing all questions, provide:
 
 ## 🎯 Overall Session Assessment
 
-**Top strengths (2–3):** across all answers
-**Top areas to improve (2–3):** with one concrete action per area
-**Practice recommendation:** one targeted drill for the biggest weakness
+### Strengths (2–3)
+For each: name the strength, quote or cite the answer where it appeared, and explain why it works.
 
-End with a brief encouraging note.
+### Critical Areas to Improve (2–3)
+For each: name the specific problem, cite which answers it appeared in, and give ONE concrete, actionable fix the candidate can practice today.
 
-> *Note: This critique is based on transcript text and timing data only. Tone, vocal energy, and confidence assessment require audio analysis and are not included.*`;
+### Prioritized Practice Drill
+Identify the single biggest weakness across the session and prescribe a specific drill:
+- What to practice (exact exercise or method)
+- How often / for how long
+- What "good" looks like so they know when they've improved
+
+### Hiring Manager Perspective
+In 2–3 sentences: if this were a real interview, what would a hiring manager's gut reaction be after hearing these answers? Would the candidate advance to the next round? What single thing is holding them back?
+
+---
+
+> *This critique is based on transcript text and timing data only. Tone, vocal energy, and confidence assessment are not included.*`;
 
       const { default: OpenAI } = await import("openai");
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -2975,7 +3021,7 @@ End with a brief encouraging note.
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 4000,
+        max_tokens: 6000,
         temperature: 0.4,
       });
 
