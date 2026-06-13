@@ -48,6 +48,8 @@ import {
   Building2,
   RefreshCw,
   Video,
+  Menu,
+  Plus,
 } from "lucide-react";
 import { SiLinkedin, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
 import MockInterviewPanel, { type InterviewQuestion, type SessionAnswer } from "@/components/MockInterviewPanel";
@@ -307,6 +309,7 @@ export default function ChatHome() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentSessionPrompt, setCurrentSessionPrompt] = useState<string>("");
   const [resumeScore, setResumeScore] = useState<number | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -1620,12 +1623,21 @@ End with a candid, constructive closing note. If their expectations need adjusti
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-40">
+        <div className="px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Logo size="sm" />
+            {user && (
+              <button
+                onClick={() => setSidebarOpen((o) => !o)}
+                className="md:hidden p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label="Toggle sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+            <Logo size="md" />
             {state !== "idle" && (
               <button
                 onClick={resetChat}
@@ -1680,8 +1692,57 @@ End with a candid, constructive closing note. If their expectations need adjusti
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-6 flex flex-col">
+      {/* Body: sidebar + main */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left sidebar – logged-in users only */}
+        {user && (
+          <>
+            {sidebarOpen && (
+              <div
+                className="fixed inset-0 z-30 bg-black/40 md:hidden"
+                onClick={() => setSidebarOpen(false)}
+              />
+            )}
+            <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-background border-r border-border/50 flex flex-col pt-14 transition-transform duration-200 ease-in-out md:relative md:inset-auto md:z-auto md:pt-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
+              <div className="p-3 border-b border-border/50 flex-shrink-0">
+                <button
+                  onClick={() => { resetChat(); setSidebarOpen(false); }}
+                  data-testid="button-new-chat-sidebar"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 text-sm text-muted-foreground hover:text-foreground transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  New chat
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                {savedSessions.length > 0 ? (
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide px-2 pt-2 pb-1">Recent</p>
+                    {savedSessions.map((session) => (
+                      <button
+                        key={session.id}
+                        onClick={() => { resumeSession(session); setSidebarOpen(false); }}
+                        className="w-full text-left px-2 py-2.5 rounded-lg hover:bg-muted/60 transition-colors"
+                      >
+                        <p className="text-xs text-foreground/90 truncate leading-snug">{session.prompt}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {new Date(session.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-6 px-3">No conversations yet — start one above!</p>
+                )}
+              </div>
+            </aside>
+          </>
+        )}
+
+        {/* Main chat column */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto w-full px-4 py-6 flex flex-col">
         {/* Welcome screen */}
         {state === "idle" && messages.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center py-12 gap-8">
@@ -1780,119 +1841,71 @@ End with a candid, constructive closing note. If their expectations need adjusti
                   </div>
                 )}
 
-                {/* Last conversation resume card */}
-                {savedSessions.length > 0 && (
-                  <div className="flex-1 min-w-[160px] bg-card border border-border/60 rounded-xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-                      <Clock className="w-3.5 h-3.5 text-primary" />
-                      Last Conversation
-                    </div>
-                    <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug mt-1">
-                      {savedSessions[0].prompt}
-                    </p>
-                    <button
-                      onClick={() => resumeSession(savedSessions[0])}
-                      className="flex items-center gap-1 text-xs text-primary/70 hover:text-primary mt-1.5 transition-colors font-medium"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                      Resume conversation
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 
             {/* Quick access tools for logged-in users */}
             {user && (
               <div className="w-full max-w-xl">
-                <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">Quick tools</p>
-                <div className="flex flex-wrap gap-2">
+                <p className="text-xs text-muted-foreground mb-2.5 font-medium uppercase tracking-wide">Quick tools</p>
+                <div className="flex flex-wrap gap-2.5">
                   {[
                     { label: "Resume Analysis", prompt: "Analyze my resume and give me detailed feedback", icon: FileText },
                     { label: "Job Match Analysis", prompt: "Help me find jobs that match my skills and experience — I want a job match score and tailored resume", icon: Briefcase },
                     { label: "Career Roadmap", prompt: "Help me build a career roadmap for my goals", icon: Route },
-                    { label: "Interview Prep", prompt: "Help me prepare for an upcoming interview", icon: MessageSquare },
                     { label: "Micro-Projects", prompt: "Suggest portfolio projects I can build to strengthen my resume", icon: Zap },
                     { label: "Salary Negotiation", prompt: "Help me negotiate my salary — I want to understand my leverage and get a negotiation strategy", icon: DollarSign },
                   ].map(({ label, prompt, icon: Icon }) => (
                     <button
                       key={label}
                       onClick={() => handleInitialMessage(prompt)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 text-xs text-muted-foreground hover:text-foreground transition-all"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 text-sm text-muted-foreground hover:text-foreground transition-all"
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon className="w-4 h-4" />
                       {label}
                     </button>
                   ))}
                   <button
                     onClick={() => handleInitialMessage("Match careers to my resume based on my background")}
                     data-testid="button-career-match-quick-tool"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-sm text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-all"
                   >
-                    <Target className="w-3.5 h-3.5" />
+                    <Target className="w-4 h-4" />
                     Career Match
                   </button>
                   <button
                     onClick={handleNetworkingClick}
                     data-testid="button-networking-quick-tool"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-950/20 hover:border-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-xs text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-950/20 hover:border-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-sm text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 transition-all"
                   >
-                    <Users className="w-3.5 h-3.5" />
+                    <Users className="w-4 h-4" />
                     Networking
                   </button>
                   <button
                     onClick={handleMockInterviewClick}
                     data-testid="button-mock-interview-quick-tool"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-xs text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-sm text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-all"
                   >
-                    <Video className="w-3.5 h-3.5" />
+                    <Video className="w-4 h-4" />
                     Mock Interview
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Recent conversations (for logged-in users) OR starter prompts (for guests) */}
+            {/* Starter prompts */}
             <div className="flex flex-col gap-2 w-full max-w-xl">
-              {user && savedSessions.length > 0 ? (
-                <>
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Recent conversations</p>
-                  {savedSessions.slice(0, 3).map((session) => (
-                    <button
-                      key={session.id}
-                      onClick={() => resumeSession(session)}
-                      className="group text-left px-4 py-3 rounded-xl border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 flex items-center justify-between gap-3"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                        <span className="text-sm text-muted-foreground group-hover:text-foreground truncate">
-                          {session.prompt}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-xs text-muted-foreground/60">
-                          {new Date(session.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        </span>
-                        <RotateCcw className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-primary transition-all duration-200" />
-                      </div>
-                    </button>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ask me anything</p>
-                  {STARTER_PROMPTS.map((prompt) => (
-                    <button
-                      key={prompt}
-                      onClick={() => handleInitialMessage(prompt)}
-                      className="group text-left px-4 py-3 rounded-xl border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-sm text-muted-foreground hover:text-foreground flex items-center justify-between"
-                    >
-                      <span>{prompt}</span>
-                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 text-primary transition-all duration-200 flex-shrink-0 ml-2" />
-                    </button>
-                  ))}
-                </>
-              )}
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ask me anything</p>
+              {STARTER_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => handleInitialMessage(prompt)}
+                  className="group text-left px-4 py-3 rounded-xl border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-sm text-muted-foreground hover:text-foreground flex items-center justify-between"
+                >
+                  <span>{prompt}</span>
+                  <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 text-primary transition-all duration-200 flex-shrink-0 ml-2" />
+                </button>
+              ))}
             </div>
 
             {!user && (
@@ -2105,10 +2118,6 @@ End with a candid, constructive closing note. If their expectations need adjusti
                           Want to explore more tools?
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me prepare for an upcoming interview")}>
-                            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                            Interview Prep
-                          </Button>
                           <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
                             <Route className="w-3.5 h-3.5 mr-1.5" />
                             Career Roadmap
@@ -2132,10 +2141,6 @@ End with a candid, constructive closing note. If their expectations need adjusti
                             <Route className="w-3.5 h-3.5 mr-1.5" />
                             Career Roadmap
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me prepare for an upcoming interview")}>
-                            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                            Interview Prep
-                          </Button>
                         </div>
                       </>
                     )}
@@ -2158,91 +2163,94 @@ End with a candid, constructive closing note. If their expectations need adjusti
             <div ref={messagesEndRef} />
           </div>
         )}
-      </div>
-
-      {/* Input area */}
-      {state !== "generating" && state !== "generating_match" && state !== "generating_docs" && state !== "complete" && (
-        <div className="sticky bottom-0 bg-background/90 backdrop-blur-sm border-t border-border/50">
-          <div className="max-w-3xl mx-auto px-4 py-3">
-            {showFileUpload && (
-              <div className="mb-2 flex items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Paperclip className="w-3.5 h-3.5" />
-                  Upload resume
-                </Button>
-                <span className="text-xs text-muted-foreground">or paste text below</span>
-              </div>
-            )}
-            {state === "job_details" && (
-              <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Link2 className="w-3.5 h-3.5 flex-shrink-0" />
-                Paste the job description text <span className="font-medium text-foreground">(recommended)</span> or a job URL
-              </div>
-            )}
-            {state === "job_posting" && (
-              <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Briefcase className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
-                <span>Paste the <span className="font-medium text-foreground">full job posting</span> — title, responsibilities, and qualifications — for the most accurate match score</span>
-              </div>
-            )}
-            {state === "targeting" && (
-              <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <TrendingUp className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
-                <span>Targeting details — step <span className="font-medium text-foreground">{data.targetingStep + 1}</span> of {RESUME_SCORE_TARGETING_QUESTIONS.length}</span>
-              </div>
-            )}
-            <div className="flex gap-2 items-end">
-              <Textarea
-                ref={textareaRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={getInputPlaceholder()}
-                rows={1}
-                className="resize-none min-h-[44px] max-h-[200px] text-sm rounded-xl"
-                style={{ height: "44px" }}
-                onInput={(e) => {
-                  const t = e.currentTarget;
-                  t.style.height = "44px";
-                  t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
-                }}
-              />
-              <Button
-                size="icon"
-                className="h-11 w-11 rounded-xl flex-shrink-0"
-                onClick={handleSendMessage}
-                disabled={!inputValue.trim()}
-              >
-                <Send className="w-4 h-4" />
-              </Button>
             </div>
-            <p className="text-xs text-muted-foreground/50 mt-1.5 text-center">
-              Enter to send · Shift+Enter for new line
-            </p>
           </div>
-        </div>
-      )}
 
-      {(state === "generating" || state === "generating_match" || state === "generating_docs") && (
-        <div className="sticky bottom-0 bg-background/90 backdrop-blur-sm border-t border-border/50">
-          <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            {state === "generating_docs" ? "Generating tailored resume & cover letter…" : "Generating your personalized analysis…"}
-          </div>
+          {/* Input area */}
+          {state !== "generating" && state !== "generating_match" && state !== "generating_docs" && state !== "complete" && (
+            <div className="bg-background/90 backdrop-blur-sm border-t border-border/50 flex-shrink-0">
+              <div className="max-w-3xl mx-auto px-4 py-3">
+                {showFileUpload && (
+                  <div className="mb-2 flex items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.txt"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                      Upload resume
+                    </Button>
+                    <span className="text-xs text-muted-foreground">or paste text below</span>
+                  </div>
+                )}
+                {state === "job_details" && (
+                  <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Link2 className="w-3.5 h-3.5 flex-shrink-0" />
+                    Paste the job description text <span className="font-medium text-foreground">(recommended)</span> or a job URL
+                  </div>
+                )}
+                {state === "job_posting" && (
+                  <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Briefcase className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                    <span>Paste the <span className="font-medium text-foreground">full job posting</span> — title, responsibilities, and qualifications — for the most accurate match score</span>
+                  </div>
+                )}
+                {state === "targeting" && (
+                  <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <TrendingUp className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                    <span>Targeting details — step <span className="font-medium text-foreground">{data.targetingStep + 1}</span> of {RESUME_SCORE_TARGETING_QUESTIONS.length}</span>
+                  </div>
+                )}
+                <div className="flex gap-2 items-end">
+                  <Textarea
+                    ref={textareaRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={getInputPlaceholder()}
+                    rows={1}
+                    className="resize-none min-h-[44px] max-h-[200px] text-sm rounded-xl"
+                    style={{ height: "44px" }}
+                    onInput={(e) => {
+                      const t = e.currentTarget;
+                      t.style.height = "44px";
+                      t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    className="h-11 w-11 rounded-xl flex-shrink-0"
+                    onClick={handleSendMessage}
+                    disabled={!inputValue.trim()}
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground/50 mt-1.5 text-center">
+                  Enter to send · Shift+Enter for new line
+                </p>
+              </div>
+            </div>
+          )}
+
+          {(state === "generating" || state === "generating_match" || state === "generating_docs") && (
+            <div className="bg-background/90 backdrop-blur-sm border-t border-border/50 flex-shrink-0">
+              <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {state === "generating_docs" ? "Generating tailored resume & cover letter…" : "Generating your personalized analysis…"}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
