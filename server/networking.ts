@@ -3,7 +3,7 @@ import OpenAI from "openai";
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ── result cache ──────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_TTL_MS = 30 * 60 * 1000;
 const resultCache = new Map<string, { data: NetworkingRecommendations; expiresAt: number }>();
 
 function cacheKey(role: string, industries: string[], location: string): string {
@@ -16,6 +16,8 @@ function pruneCache(): void {
     if (v.expiresAt < now) resultCache.delete(k);
   }
 }
+
+// ── interfaces ────────────────────────────────────────────────────────────────
 
 export interface NetworkingEvent {
   id: string;
@@ -32,7 +34,7 @@ export interface NetworkingEvent {
 export interface SocialGroup {
   id: string;
   name: string;
-  platform: "LinkedIn" | "Facebook";
+  platform: "LinkedIn";
   description: string;
   whyRelevant: string;
   url: string;
@@ -60,14 +62,96 @@ export interface NetworkingRecommendations {
   };
 }
 
+export interface UserNetworkingProfile {
+  targetRole: string;
+  industries: string[];
+  topGaps: string[];
+  location: string;
+  major?: string;
+  school?: string;
+  currentCompany?: string;
+  gradYear?: number;
+  yearsOfExperience?: number;
+}
+
+interface SearchKeywords {
+  groupKeywords: string;   // for LinkedIn URL + Reddit/Discord/Slack SearXNG
+  eventKeywords: string;   // for Eventbrite/Meetup SearXNG (location appended separately)
+}
+
 interface SearXNGResult {
   url: string;
   title: string;
   content: string;
-  engine?: string;
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── GPT keyword generation ────────────────────────────────────────────────────
+
+export async function generateSearchKeywords(
+  profile: UserNetworkingProfile
+): Promise<SearchKeywords> {
+  const isStudent = profile.gradYear
+    ? profile.gradYear >= new Date().getFullYear()
+    : !profile.yearsOfExperience;
+
+  const context = [
+    `Target role: ${profile.targetRole}`,
+    profile.industries.length ? `Industries: ${profile.industries.join(", ")}` : "",
+    profile.major ? `Major/field: ${profile.major}` : "",
+    isStudent && profile.school ? `University: ${profile.school}` : "",
+    !isStudent && profile.currentCompany ? `Current company: ${profile.currentCompany}` : "",
+    isStudent && profile.gradYear ? `Graduating: ${profile.gradYear}` : "",
+    !isStudent && profile.yearsOfExperience ? `Years of experience: ${profile.yearsOfExperience}` : "",
+    profile.topGaps.length ? `Skills to develop: ${profile.topGaps.slice(0, 4).join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const prompt = `You are a career expert generating search keywords for a ${isStudent ? "student" : "working professional"}.
+
+User profile:
+${context}
+
+Generate two sets of search keywords:
+
+1. GROUP/COMMUNITY keywords: For LinkedIn groups, Reddit, Discord, and Slack communities. Topic/role focused — NO location. Use professional terminology. ${isStudent ? "Include student/early-career/alumni angles where appropriate." : "Use industry/professional-level terms."}
+
+2. EVENT keywords: For Eventbrite and Meetup event searches. Topic/role focused — NO location (location is added separately). Use terms that would appear in event titles.
+
+Rules:
+- Output ONLY keyword strings — no URLs, no descriptions, no explanations.
+- Each keyword set should be 3–6 words, suitable for a search engine query.
+- Keep them specific, not generic ("machine learning engineers" > "tech professionals").
+
+Return exactly this JSON:
+{
+  "groupKeywords": "3-6 word phrase for community search",
+  "eventKeywords": "3-6 word phrase for event search"
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+    });
+
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    return {
+      groupKeywords: result.groupKeywords || profile.targetRole,
+      eventKeywords: result.eventKeywords || profile.targetRole,
+    };
+  } catch (err: any) {
+    console.error("[networking] keyword generation failed:", err.message);
+    return {
+      groupKeywords: profile.targetRole,
+      eventKeywords: profile.targetRole,
+    };
+  }
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 async function validateUrl(url: string, timeoutMs = 6000): Promise<boolean> {
   try {
@@ -92,29 +176,19 @@ async function searxSearch(query: string, timeoutMs = 10000): Promise<SearXNGRes
     console.warn("SEARXNG_URL not set");
     return [];
   }
-
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const url = `${base}/search?q=${encodeURIComponent(query)}&format=json`;
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    });
+    const res = await fetch(
+      `${base}/search?q=${encodeURIComponent(query)}&format=json`,
+      { signal: controller.signal, headers: { Accept: "application/json" } }
+    );
     clearTimeout(timer);
-
     if (res.status === 403) {
-      console.error(
-        "SearXNG returned 403 — JSON format may not be enabled in settings.yml. " +
-        "Add 'json' to search.formats in your SearXNG instance."
-      );
+      console.error("SearXNG 403 — enable json in settings.yml: search.formats: [html, json]");
       return [];
     }
-    if (!res.ok) {
-      console.error(`SearXNG error: ${res.status}`);
-      return [];
-    }
-
+    if (!res.ok) { console.error(`SearXNG error: ${res.status}`); return []; }
     const data = await res.json() as { results?: SearXNGResult[] };
     return data.results || [];
   } catch (err: any) {
@@ -123,54 +197,41 @@ async function searxSearch(query: string, timeoutMs = 10000): Promise<SearXNGRes
   }
 }
 
-function inferPlatform(url: string): string {
-  if (url.includes("reddit.com")) return "Reddit";
-  if (url.includes("discord.com") || url.includes("discord.gg")) return "Discord";
-  if (url.includes("slack.com")) return "Slack";
-  if (url.includes("linkedin.com")) return "LinkedIn";
-  if (url.includes("facebook.com")) return "Facebook";
-  if (url.includes("eventbrite.com")) return "Eventbrite";
-  if (url.includes("meetup.com")) return "Meetup";
-  return "Other";
-}
-
-// ── events ───────────────────────────────────────────────────────────────────
+// ── events ────────────────────────────────────────────────────────────────────
 
 export async function fetchEvents(
-  targetRole: string
+  eventKeywords: string,
+  location: string
 ): Promise<NetworkingEvent[]> {
+  const locSuffix = location ? ` ${location}` : "";
+
   const [ebResults, muResults] = await Promise.all([
-    searxSearch(`site:eventbrite.com ${targetRole} networking`),
-    searxSearch(`site:meetup.com ${targetRole} professional`),
+    searxSearch(`site:eventbrite.com ${eventKeywords}${locSuffix}`),
+    searxSearch(`site:meetup.com ${eventKeywords}${locSuffix}`),
   ]);
 
   const candidates = [
     ...ebResults.slice(0, 6).map((r) => ({ ...r, source: "eventbrite" as const })),
     ...muResults.slice(0, 6).map((r) => ({ ...r, source: "meetup" as const })),
   ].filter(
-    (r) =>
-      r.url &&
-      (r.url.includes("eventbrite.com/e/") || r.url.includes("meetup.com/"))
+    (r) => r.url && (r.url.includes("eventbrite.com/e/") || r.url.includes("meetup.com/"))
   );
 
   const validated = await Promise.all(
     candidates.map(async (r, i) => {
       const ok = await validateUrl(r.url);
       if (!ok) return null;
-
       const isOnline =
         r.title.toLowerCase().includes("online") ||
-        r.title.toLowerCase().includes("virtual") ||
-        r.url.includes("online");
-
+        r.title.toLowerCase().includes("virtual");
       return {
         id: `ev-${i}`,
         name: r.title || "Networking Event",
         description: (r.content || "").slice(0, 200),
-        whyRelevant: `Found for "${targetRole}" professionals.`,
+        whyRelevant: `Found for "${eventKeywords}"${location ? ` near ${location}` : ""}.`,
         url: r.url,
         date: "See event page",
-        location: isOnline ? "Online" : "See event page",
+        location: isOnline ? "Online" : location || "See event page",
         isOnline,
         source: r.source,
       } satisfies NetworkingEvent;
@@ -180,22 +241,18 @@ export async function fetchEvents(
   return validated.filter((e): e is NetworkingEvent => e !== null).slice(0, 5);
 }
 
-// ── social groups ─────────────────────────────────────────────────────────────
+// ── social groups (LinkedIn pre-filled search — no SearXNG, no 200-check) ─────
 
 export async function fetchSocialGroups(
+  groupKeywords: string,
   targetRole: string,
   industries: string[]
 ): Promise<SocialGroup[]> {
-  // LinkedIn only — always return a pre-filled search link (no SearXNG, no 200-check).
-  // Query is role/topic only; location is intentionally excluded for groups.
-  // encodeURIComponent ensures spaces become %20, not +.
-  const terms = [targetRole, ...industries.slice(0, 1)].filter(Boolean).join(" ");
-  const encoded = encodeURIComponent(terms);
-
+  const encoded = encodeURIComponent(groupKeywords);
   return [
     {
       id: "sg-linkedin",
-      name: `LinkedIn Groups — ${terms}`,
+      name: `LinkedIn Groups — ${groupKeywords}`,
       platform: "LinkedIn",
       description: `Browse LinkedIn groups for ${targetRole} professionals and related communities.`,
       whyRelevant: `Connects you with peers, recruiters, and industry insiders in the ${targetRole} space${industries.length ? ` (${industries[0]})` : ""}.`,
@@ -205,19 +262,20 @@ export async function fetchSocialGroups(
   ];
 }
 
-// ── forums ────────────────────────────────────────────────────────────────────
+// ── forums (Reddit + Discord/Slack via SearXNG, validated) ───────────────────
 
 export async function fetchForums(
+  groupKeywords: string,
   targetRole: string,
   topGaps: string[]
 ): Promise<CommunityForum[]> {
-  const gapTerm = topGaps.length ? topGaps[0] : "";
-
   const [redditResults, discordResults, slackResults] = await Promise.all([
-    searxSearch(`site:reddit.com ${targetRole} ${gapTerm} community`),
-    searxSearch(`${targetRole} discord community server`),
-    searxSearch(`${targetRole} slack community workspace`),
+    searxSearch(`site:reddit.com ${groupKeywords}`),
+    searxSearch(`${groupKeywords} discord community server`),
+    searxSearch(`${groupKeywords} slack community workspace`),
   ]);
+
+  const gapTerm = topGaps.length ? topGaps[0] : "";
 
   const candidates: Array<SearXNGResult & { inferredPlatform: string }> = [
     ...redditResults
@@ -238,17 +296,15 @@ export async function fetchForums(
     candidates.map(async (r, i) => {
       const ok = await validateUrl(r.url);
       if (!ok) return null;
-
       const platform = r.inferredPlatform as CommunityForum["platform"];
       return {
         id: `fo-${i}`,
         name: r.title || `${platform} Community`,
         platform,
         description: (r.content || "").slice(0, 180),
-        whyRelevant:
-          gapTerm
-            ? `Relevant to your gap in ${gapTerm} and your target role as a ${targetRole}.`
-            : `A ${platform} community for ${targetRole} professionals.`,
+        whyRelevant: gapTerm
+          ? `Relevant to your gap in ${gapTerm} and your target role as a ${targetRole}.`
+          : `A ${platform} community for ${targetRole} professionals.`,
         url: r.url,
       } satisfies CommunityForum;
     })
@@ -264,7 +320,8 @@ export async function getNetworkingRecommendations(
   industries: string[],
   gaps: any[],
   location: string,
-  force = false
+  force = false,
+  profileExtras: Partial<UserNetworkingProfile> = {}
 ): Promise<NetworkingRecommendations> {
   const topGaps = Array.isArray(gaps)
     ? gaps
@@ -285,10 +342,21 @@ export async function getNetworkingRecommendations(
     console.log(`[networking] force refresh for "${key}"`);
   }
 
+  const profile: UserNetworkingProfile = {
+    targetRole,
+    industries,
+    topGaps,
+    location,
+    ...profileExtras,
+  };
+
+  const { groupKeywords, eventKeywords } = await generateSearchKeywords(profile);
+  console.log(`[networking] keywords — group: "${groupKeywords}", events: "${eventKeywords}"`);
+
   const [events, socialGroups, forums] = await Promise.all([
-    fetchEvents(targetRole),
-    fetchSocialGroups(targetRole, industries),
-    fetchForums(targetRole, topGaps),
+    fetchEvents(eventKeywords, location),
+    fetchSocialGroups(groupKeywords, targetRole, industries),
+    fetchForums(groupKeywords, targetRole, topGaps),
   ]);
 
   const result: NetworkingRecommendations = {
@@ -301,7 +369,7 @@ export async function getNetworkingRecommendations(
 
   pruneCache();
   resultCache.set(key, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
-  console.log(`[networking] cached result for "${key}" (expires in 30 min)`);
+  console.log(`[networking] cached for "${key}" (30 min)`);
 
   return result;
 }

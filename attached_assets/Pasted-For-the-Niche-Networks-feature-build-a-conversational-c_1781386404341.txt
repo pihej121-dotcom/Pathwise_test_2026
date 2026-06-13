@@ -1,0 +1,28 @@
+For the Niche Networks feature, build a conversational chat-flow intake that matches the app's existing chat UI, used to collect the info the feature needs.
+
+Conversational intake:
+- Ask the user for their info through a short chat conversation, one question at a time, in the same chat style used elsewhere in the app.
+- Collect these inputs:
+  1. Target role / career interests
+  2. School year (e.g. sophomore, senior) OR years of experience
+  3. Major / field of study
+  4. University OR current company
+- Pre-fill from the profile: if any of these are already known, skip asking for them (or confirm rather than re-ask). Don't make the user repeat info the app already has.
+- Save the answers back to the user's profile so other features can use them. Reuse existing profile fields; don't duplicate.
+- Keep it short and natural. A few quick questions, then proceed.
+
+GPT keyword generation:
+- After collecting the inputs, send them to GPT to generate the most relevant search keywords. Do NOT search with the raw user inputs directly; use GPT to translate them into high-quality search terms.
+- Generate two separate keyword sets:
+  a. GROUP/COMMUNITY keywords (for LinkedIn, Reddit, Discord, Slack) — topic/role focused, NO location.
+  b. EVENT keywords (for SearXNG event search) — topic/role focused, and these DO get combined with the user's location.
+- Use context smartly: a student's major, year, and university should inform student/early-career/alumni-oriented terms; a professional's experience and company should inform industry-oriented terms.
+- GPT should output ONLY search keyword strings. It must not generate or guess any URLs. URLs still come only from SearXNG results or the LinkedIn pre-filled search pattern.
+
+Everything else stays as built:
+- SearXNG for Reddit/Discord/Slack/events (events include location), validated real links.
+- LinkedIn pre-filled search link: https://www.linkedin.com/search/results/groups/?keywords={terms} with %20 for spaces, no 200-check.
+- No Facebook. Never invent a URL.
+- Target role remains required; location required for events only; resume gaps optional.
+
+Before coding, tell me: which of these four fields already exist on the user profile vs. need to be added, and which GPT model/endpoint you'll use for the keyword generation. Then proceed.

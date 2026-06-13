@@ -63,7 +63,23 @@ type ConversationState =
   | "generating_docs"
   | "targeting"
   | "generating"
+  | "networking_intake"
   | "complete";
+
+interface NetworkingIntake {
+  steps: string[];
+  stepIndex: number;
+  isStudent: boolean | null;
+  collected: {
+    targetRole?: string;
+    isStudent?: boolean;
+    gradYear?: number;
+    yearsOfExperience?: number;
+    major?: string;
+    school?: string;
+    currentCompany?: string;
+  };
+}
 
 type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "general" | null;
 
@@ -297,6 +313,7 @@ export default function ChatHome() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const networkingIntakeRef = useRef<NetworkingIntake | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -362,28 +379,85 @@ export default function ChatHome() {
     }
   };
 
-  const handleNetworkingClick = async () => {
-    addMessage("user", "Find me networking opportunities — events, groups, and communities for my career");
-    setCurrentSessionPrompt("Find me networking opportunities");
-    setState("generating" as ConversationState);
-    setIsTyping(true);
+  // ── networking intake helpers ────────────────────────────────────────────────
 
+  function getIntakeQuestion(step: string, isStudent: boolean | null): string {
+    switch (step) {
+      case "role": return "What role are you targeting? *(e.g. Software Engineer, Product Manager, Data Analyst)*";
+      case "type": return "Are you currently a **student** or a **working professional**?";
+      case "gradYear": return "What year do you graduate? *(e.g. 2026, 2027)*";
+      case "experience": return "How many years of professional experience do you have?";
+      case "major": return "What's your major or field of study?";
+      case "school": return "Which university do you attend?";
+      case "company": return "Which company do you currently work at?";
+      default: return "Tell me a bit more about your background.";
+    }
+  }
+
+  function buildIntakeSteps(u: typeof user): { steps: string[]; isStudent: boolean | null } {
+    const steps: string[] = [];
+    let isStudent: boolean | null = null;
+
+    if (!u?.targetRole) steps.push("role");
+
+    if (u?.gradYear) {
+      isStudent = true;
+    } else if (u?.yearsOfExperience != null) {
+      isStudent = false;
+    } else {
+      steps.push("type");
+    }
+
+    if (!u?.major) steps.push("major");
+
+    if (isStudent === true && !u?.school) steps.push("school");
+    if (isStudent === false && !u?.currentCompany) steps.push("company");
+
+    return { steps, isStudent };
+  }
+
+  const saveIntakeToProfile = async (collected: NetworkingIntake["collected"]) => {
+    const body: Record<string, any> = {};
+    if (collected.targetRole) body.targetRole = collected.targetRole;
+    if (collected.gradYear) body.gradYear = collected.gradYear;
+    if (collected.yearsOfExperience != null) body.yearsOfExperience = collected.yearsOfExperience;
+    if (collected.major) body.major = collected.major;
+    if (collected.school) body.school = collected.school;
+    if (collected.currentCompany) body.currentCompany = collected.currentCompany;
+    if (Object.keys(body).length === 0) return;
     try {
-      const res = await fetch("/api/networking/recommendations", {
+      await fetch("/api/users/settings", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    } catch (e: any) {
+      console.error("[intake] profile save failed:", e.message);
+    }
+  };
+
+  const doFetchNetworking = async (forceRefresh = false) => {
+    setState("generating");
+    setIsTyping(true);
+    try {
+      const url = forceRefresh
+        ? "/api/networking/recommendations?force=true"
+        : "/api/networking/recommendations";
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
       });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to fetch networking recommendations");
       }
-
-      const data: NetworkingRecommendations = await res.json();
+      const rec: NetworkingRecommendations = await res.json();
       setIsTyping(false);
-
-      const ctx = data.userContext;
-      const intro = `Here are personalized networking opportunities for **${ctx.targetRole || "your career"}**${ctx.location ? ` near ${ctx.location}` : ""}${ctx.topGaps.length ? `, focusing on your gaps: ${ctx.topGaps.slice(0, 3).join(", ")}` : ""}.`;
-
+      const ctx = rec.userContext;
+      const intro = `Here are personalised networking opportunities for **${ctx.targetRole || "your career"}**${ctx.location ? ` near ${ctx.location}` : ""}${ctx.topGaps.length ? `, focusing on your development areas: *${ctx.topGaps.slice(0, 3).join(", ")}*` : ""}.`;
       setMessages((prev) => [
         ...prev,
         {
@@ -391,7 +465,7 @@ export default function ChatHome() {
           role: "assistant",
           content: intro,
           timestamp: new Date(),
-          networkingData: data,
+          networkingData: rec,
         },
       ]);
       setState("complete");
@@ -400,6 +474,90 @@ export default function ChatHome() {
       await simulateAssistantReply(`Sorry, I couldn't load networking recommendations right now. ${err.message || "Please try again."}`);
       setState("complete");
     }
+  };
+
+  const handleNetworkingIntakeAnswer = async (text: string) => {
+    const intake = networkingIntakeRef.current;
+    if (!intake) return;
+
+    const step = intake.steps[intake.stepIndex];
+
+    switch (step) {
+      case "role":
+        intake.collected.targetRole = text;
+        break;
+      case "type": {
+        const lower = text.toLowerCase();
+        const isStud =
+          lower.includes("student") || lower.includes("study") ||
+          lower.includes("university") || lower.includes("college") ||
+          lower.includes("school") || lower.includes("graduating") ||
+          lower.includes("grad");
+        intake.isStudent = isStud;
+        intake.collected.isStudent = isStud;
+        const insertAt = intake.stepIndex + 1;
+        if (isStud) {
+          if (!user?.gradYear) intake.steps.splice(insertAt, 0, "gradYear");
+          if (!user?.school) intake.steps.push("school");
+        } else {
+          if (!user?.yearsOfExperience) intake.steps.splice(insertAt, 0, "experience");
+          if (!user?.currentCompany) intake.steps.push("company");
+        }
+        break;
+      }
+      case "gradYear": {
+        const match = text.match(/\b(20\d{2})\b/);
+        intake.collected.gradYear = match ? parseInt(match[1], 10) : new Date().getFullYear() + 1;
+        break;
+      }
+      case "experience": {
+        const match = text.match(/\d+/);
+        intake.collected.yearsOfExperience = match ? parseInt(match[0], 10) : 0;
+        break;
+      }
+      case "major":
+        intake.collected.major = text;
+        break;
+      case "school":
+        intake.collected.school = text;
+        break;
+      case "company":
+        intake.collected.currentCompany = text;
+        break;
+    }
+
+    intake.stepIndex += 1;
+
+    if (intake.stepIndex < intake.steps.length) {
+      const nextStep = intake.steps[intake.stepIndex];
+      await simulateAssistantReply(getIntakeQuestion(nextStep, intake.isStudent));
+      return;
+    }
+
+    await simulateAssistantReply("Got it! Let me find the best networking opportunities for you…", 400);
+    await saveIntakeToProfile(intake.collected);
+    networkingIntakeRef.current = null;
+    await doFetchNetworking();
+  };
+
+  const handleNetworkingClick = async () => {
+    addMessage("user", "Find me networking opportunities — events, groups, and communities for my career");
+    setCurrentSessionPrompt("Find me networking opportunities");
+
+    const { steps, isStudent } = buildIntakeSteps(user);
+
+    if (steps.length === 0) {
+      await doFetchNetworking();
+      return;
+    }
+
+    networkingIntakeRef.current = { steps, stepIndex: 0, isStudent, collected: {} };
+    setState("networking_intake");
+
+    const firstQ = getIntakeQuestion(steps[0], isStudent);
+    await simulateAssistantReply(
+      `I'll find networking opportunities tailored to your profile. Just a few quick questions first!\n\n${firstQ}`
+    );
   };
 
   const resumeSession = (session: SavedSession) => {
@@ -1141,6 +1299,9 @@ End with a candid, constructive closing note. If their expectations need adjusti
     } else if (state === "targeting") {
       addMessage("user", text);
       await handleTargetingAnswer(text);
+    } else if (state === "networking_intake") {
+      addMessage("user", text);
+      await handleNetworkingIntakeAnswer(text);
     }
   };
 

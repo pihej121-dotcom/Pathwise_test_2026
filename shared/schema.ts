@@ -103,6 +103,8 @@ export const users = pgTable("users", {
   industries: text("industries").array(),
   targetCompanies: text("target_companies").array(),
   location: text("location"),
+  currentCompany: text("current_company"),
+  yearsOfExperience: integer("years_of_experience"),
   remoteOk: boolean("remote_ok").default(false),
   // Subscription fields
   subscriptionTier: subscriptionTierEnum("subscription_tier").notNull().default("paid"),

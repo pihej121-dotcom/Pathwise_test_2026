@@ -519,6 +519,8 @@ if (existingUser && !existingUser.isActive) {
         targetRole: z.string().optional(),
         location: z.string().optional(),
         remoteOk: z.boolean().optional(),
+        currentCompany: z.string().optional(),
+        yearsOfExperience: z.number().int().min(0).max(60).optional(),
       });
 
       const validated = settingsSchema.parse(updateData);
@@ -4011,7 +4013,14 @@ Make your recommendations specific, actionable, and data-driven based on the act
         industries,
         Array.isArray(gaps) ? gaps : [],
         location,
-        force
+        force,
+        {
+          major: user.major || undefined,
+          school: user.school || undefined,
+          currentCompany: (user as any).currentCompany || undefined,
+          gradYear: user.gradYear || undefined,
+          yearsOfExperience: (user as any).yearsOfExperience || undefined,
+        }
       );
 
       res.json(recommendations);
