@@ -137,14 +137,11 @@ function inferPlatform(url: string): string {
 // ── events ───────────────────────────────────────────────────────────────────
 
 export async function fetchEvents(
-  targetRole: string,
-  location: string
+  targetRole: string
 ): Promise<NetworkingEvent[]> {
-  const loc = location || "online";
-
   const [ebResults, muResults] = await Promise.all([
-    searxSearch(`site:eventbrite.com ${targetRole} networking ${loc}`),
-    searxSearch(`site:meetup.com ${targetRole} ${loc}`),
+    searxSearch(`site:eventbrite.com ${targetRole} networking`),
+    searxSearch(`site:meetup.com ${targetRole} professional`),
   ]);
 
   const candidates = [
@@ -170,10 +167,10 @@ export async function fetchEvents(
         id: `ev-${i}`,
         name: r.title || "Networking Event",
         description: (r.content || "").slice(0, 200),
-        whyRelevant: `Found for "${targetRole}" professionals${location ? ` in ${location}` : ""}.`,
+        whyRelevant: `Found for "${targetRole}" professionals.`,
         url: r.url,
         date: "See event page",
-        location: isOnline ? "Online" : location || "See event page",
+        location: isOnline ? "Online" : "See event page",
         isOnline,
         source: r.source,
       } satisfies NetworkingEvent;
@@ -266,7 +263,8 @@ export async function getNetworkingRecommendations(
   targetRole: string,
   industries: string[],
   gaps: any[],
-  location: string
+  location: string,
+  force = false
 ): Promise<NetworkingRecommendations> {
   const topGaps = Array.isArray(gaps)
     ? gaps
@@ -276,14 +274,19 @@ export async function getNetworkingRecommendations(
     : [];
 
   const key = cacheKey(targetRole, industries, location);
-  const cached = resultCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    console.log(`[networking] cache hit for "${key}"`);
-    return cached.data;
+
+  if (!force) {
+    const cached = resultCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      console.log(`[networking] cache hit for "${key}"`);
+      return cached.data;
+    }
+  } else {
+    console.log(`[networking] force refresh for "${key}"`);
   }
 
   const [events, socialGroups, forums] = await Promise.all([
-    fetchEvents(targetRole, location),
+    fetchEvents(targetRole),
     fetchSocialGroups(targetRole, industries),
     fetchForums(targetRole, topGaps),
   ]);

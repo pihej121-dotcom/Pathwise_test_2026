@@ -1559,7 +1559,24 @@ End with a candid, constructive closing note. If their expectations need adjusti
                     <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm shadow-sm px-5 py-4 text-sm mb-3">
                       <MessageContent content={msg.content} />
                     </div>
-                    <NetworkingPanel data={msg.networkingData} />
+                    <NetworkingPanel
+                      data={msg.networkingData}
+                      onRefresh={async () => {
+                        const res = await fetch("/api/networking/recommendations?force=true", {
+                          headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+                        });
+                        if (!res.ok) {
+                          const err = await res.json().catch(() => ({}));
+                          throw new Error(err.error || "Refresh failed");
+                        }
+                        const fresh: NetworkingRecommendations = await res.json();
+                        setMessages((prev) =>
+                          prev.map((m) =>
+                            m.id === msg.id ? { ...m, networkingData: fresh } : m
+                          )
+                        );
+                      }}
+                    />
                   </div>
                 ) : (
                   <div
@@ -1938,7 +1955,25 @@ function PlatformIcon({ platform }: { platform: string }) {
   }
 }
 
-function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
+function NetworkingPanel({
+  data,
+  onRefresh,
+}: {
+  data: NetworkingRecommendations;
+  onRefresh?: () => Promise<void>;
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="space-y-5" data-testid="networking-panel">
       {/* Events */}
@@ -2071,9 +2106,22 @@ function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground text-right">
-        Updated {new Date(data.generatedAt).toLocaleString()}
-      </p>
+      <div className="flex items-center justify-between pt-1">
+        <p className="text-xs text-muted-foreground">
+          Updated {new Date(data.generatedAt).toLocaleString()}
+        </p>
+        {onRefresh && (
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            data-testid="button-refresh-networking"
+            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 text-muted-foreground hover:text-foreground transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

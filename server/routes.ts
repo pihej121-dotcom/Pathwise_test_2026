@@ -4004,12 +4004,14 @@ Make your recommendations specific, actionable, and data-driven based on the act
       const industries: string[] = (user.industries as string[]) || [];
       const location: string = user.location || "";
 
+      const force = req.query.force === "true";
       const { getNetworkingRecommendations } = await import("./networking");
       const recommendations = await getNetworkingRecommendations(
         targetRole,
         industries,
         Array.isArray(gaps) ? gaps : [],
-        location
+        location,
+        force
       );
 
       res.json(recommendations);
