@@ -44,3 +44,7 @@ build = ["npm", "run", "build"]
 
 [userenv.shared]
 SEARXNG_URL = "https://searxng-production-9a5e.up.railway.app"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
