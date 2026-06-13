@@ -1990,10 +1990,9 @@ function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               LinkedIn &amp; Facebook Groups
             </span>
-            <span className="text-xs bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 rounded-full px-1.5 py-0.5">{data.socialGroups.length}</span>
           </div>
-          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-            <Sparkles className="w-3 h-3" /> AI-curated — verify links before joining
+          <p className="text-xs text-muted-foreground mb-2">
+            Search results tailored to your role — browse and join groups directly on each platform.
           </p>
           <div className="space-y-2">
             {data.socialGroups.map((grp) => (
@@ -2003,17 +2002,15 @@ function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
                     <div className="flex items-center gap-1.5 mb-1">
                       <PlatformIcon platform={grp.platform} />
                       <span className="text-xs text-muted-foreground">{grp.platform}</span>
-                      {grp.memberCount && <span className="text-xs text-muted-foreground">· {grp.memberCount}</span>}
                     </div>
-                    <p className="font-medium text-sm leading-snug">{grp.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{grp.description}</p>
+                    <p className="font-medium text-sm leading-snug">{grp.description}</p>
                     <div className="flex items-start gap-1 mt-1.5 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 rounded px-2 py-1">
                       <Target className="w-3 h-3 mt-0.5 shrink-0" /><span>{grp.whyRelevant}</span>
                     </div>
                   </div>
                   <a href={grp.url} target="_blank" rel="noopener noreferrer" data-testid={`link-group-${grp.id}`}>
                     <button className="shrink-0 inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all">
-                      Join <ExternalLink className="w-3 h-3" />
+                      Search <ExternalLink className="w-3 h-3" />
                     </button>
                   </a>
                 </div>
@@ -2027,14 +2024,14 @@ function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
       {data.forums.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="w-4 h-4 text-indigo-500" />
+            <SiReddit className="w-4 h-4 text-[#FF4500]" />
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Forums &amp; Communities
+              Reddit Communities
             </span>
-            <span className="text-xs bg-indigo-100 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 rounded-full px-1.5 py-0.5">{data.forums.length}</span>
+            <span className="text-xs bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 rounded-full px-1.5 py-0.5">{data.forums.length}</span>
           </div>
-          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-            <Sparkles className="w-3 h-3" /> AI-curated — verify links before joining
+          <p className="text-xs text-muted-foreground mb-2">
+            Verified subreddits — each link was confirmed active before being shown.
           </p>
           <div className="space-y-2">
             {data.forums.map((frm) => (

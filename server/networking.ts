@@ -46,6 +46,23 @@ export interface NetworkingRecommendations {
   };
 }
 
+async function validateUrl(url: string, timeoutMs = 5000): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(url, {
+      method: "HEAD",
+      signal: controller.signal,
+      redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Pathwise/1.0)" },
+    });
+    clearTimeout(timer);
+    return response.status >= 200 && response.status < 400;
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchEventbriteEvents(
   targetRole: string,
   industries: string[],
@@ -85,144 +102,157 @@ export async function fetchEventbriteEvents(
     }
 
     const data = await response.json() as any;
-    const rawEvents = (data.events || []).slice(0, 8);
+    const rawEvents = (data.events || []).slice(0, 10);
 
-    const events: NetworkingEvent[] = rawEvents.map((evt: any, i: number) => {
-      const venueName = evt.venue?.name || "";
-      const venueCity = evt.venue?.address?.city || "";
-      const venueDisplay = evt.venue?.address?.localized_address_display || "";
-      const locationStr = evt.online_event
-        ? "Online"
-        : venueDisplay || venueCity || venueName || location || "Location TBD";
+    const mapped: NetworkingEvent[] = rawEvents
+      .filter((evt: any) => evt.url && evt.url !== "https://eventbrite.com")
+      .map((evt: any, i: number) => {
+        const venueName = evt.venue?.name || "";
+        const venueCity = evt.venue?.address?.city || "";
+        const venueDisplay = evt.venue?.address?.localized_address_display || "";
+        const locationStr = evt.online_event
+          ? "Online"
+          : venueDisplay || venueCity || venueName || location || "Location TBD";
 
-      const startDate = evt.start?.local
-        ? new Date(evt.start.local).toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })
-        : "Date TBD";
+        const startDate = evt.start?.local
+          ? new Date(evt.start.local).toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : "Date TBD";
 
-      const descText: string =
-        evt.description?.text ||
-        evt.summary ||
-        `A professional networking event for ${targetRole} professionals.`;
+        const descText: string =
+          evt.description?.text ||
+          evt.summary ||
+          `A professional networking event for ${targetRole} professionals.`;
 
-      return {
-        id: evt.id || `eb-${i}`,
-        name: evt.name?.text || "Professional Networking Event",
-        description: descText.slice(0, 200) + (descText.length > 200 ? "..." : ""),
-        whyRelevant: `Relevant to your target role as a ${targetRole}${industries.length ? ` in ${industries[0]}` : ""}.`,
-        url: evt.url || "https://eventbrite.com",
-        date: startDate,
-        location: locationStr,
-        isOnline: evt.online_event || false,
-        source: "eventbrite" as const,
-      };
-    });
+        return {
+          id: evt.id || `eb-${i}`,
+          name: evt.name?.text || "Professional Networking Event",
+          description: descText.slice(0, 200) + (descText.length > 200 ? "..." : ""),
+          whyRelevant: `Relevant to your target role as a ${targetRole}${industries.length ? ` in ${industries[0]}` : ""}.`,
+          url: evt.url as string,
+          date: startDate,
+          location: locationStr,
+          isOnline: evt.online_event || false,
+          source: "eventbrite" as const,
+        };
+      });
 
-    return events;
+    const validated = await Promise.all(
+      mapped.map(async (evt) => {
+        const ok = await validateUrl(evt.url);
+        return ok ? evt : null;
+      })
+    );
+
+    return validated.filter((e): e is NetworkingEvent => e !== null).slice(0, 6);
   } catch (err: any) {
     console.error("Failed to fetch Eventbrite events:", err.message);
     return [];
   }
 }
 
-export async function generateCommunityRecommendations(
+export async function buildSocialGroupSearchLinks(
   targetRole: string,
   industries: string[],
-  topGaps: string[],
-  location: string
-): Promise<{ socialGroups: SocialGroup[]; forums: CommunityForum[] }> {
+  topGaps: string[]
+): Promise<SocialGroup[]> {
+  const terms = [targetRole, ...industries.slice(0, 1), ...topGaps.slice(0, 1)]
+    .filter(Boolean)
+    .join(" ");
+  const encoded = encodeURIComponent(terms);
+
+  return [
+    {
+      id: "sg-linkedin",
+      name: `LinkedIn Groups — "${terms}"`,
+      platform: "LinkedIn" as const,
+      description: `Browse LinkedIn groups for ${targetRole} professionals and related communities.`,
+      whyRelevant: `Search results filtered for your target role${industries.length ? ` in ${industries[0]}` : ""}. Join groups to connect with peers and recruiters.`,
+      url: `https://www.linkedin.com/search/results/groups/?keywords=${encoded}`,
+    },
+    {
+      id: "sg-facebook",
+      name: `Facebook Groups — "${terms}"`,
+      platform: "Facebook" as const,
+      description: `Discover Facebook groups for ${targetRole} professionals, job seekers, and industry insiders.`,
+      whyRelevant: `Facebook hosts many niche career communities${topGaps.length ? ` including groups focused on ${topGaps[0]}` : ""}.`,
+      url: `https://www.facebook.com/groups/search/?q=${encoded}`,
+    },
+  ];
+}
+
+export async function fetchValidatedRedditCommunities(
+  targetRole: string,
+  industries: string[],
+  topGaps: string[]
+): Promise<CommunityForum[]> {
   if (!process.env.OPENAI_API_KEY) {
-    return { socialGroups: [], forums: [] };
+    return [];
   }
 
   const gapsText = topGaps.length
     ? `Resume gaps to address: ${topGaps.slice(0, 5).join(", ")}`
-    : "No specific gaps identified yet.";
+    : "No specific gaps identified.";
 
   const industriesText = industries.length
-    ? `Industries of interest: ${industries.join(", ")}`
+    ? `Industries: ${industries.join(", ")}`
     : "";
 
-  const prompt = `You are a career networking expert. Based on the user's profile below, recommend highly specific and niche professional communities — NOT generic ones like "LinkedIn general networking."
-
-User profile:
-- Target role: ${targetRole}
-- ${industriesText}
-- ${gapsText}
-- Location: ${location || "Not specified"}
-
-Return a JSON object with exactly this structure:
-{
-  "socialGroups": [
-    {
-      "name": "exact group name",
-      "platform": "LinkedIn" or "Facebook",
-      "description": "1-sentence description of what the group is about",
-      "whyRelevant": "specific reason tied to their target role OR one of their gaps — mention the gap explicitly",
-      "url": "direct URL to the group (real, verifiable URL)",
-      "memberCount": "approximate member count if known, else omit"
-    }
-  ],
-  "forums": [
-    {
-      "name": "exact community name",
-      "platform": "Reddit" | "Slack" | "Discord" | "Forum" | "Other",
-      "description": "1-sentence description",
-      "whyRelevant": "specific reason tied to their target role OR one of their gaps — mention the gap explicitly",
-      "url": "direct URL"
-    }
-  ]
-}
+  const prompt = `You are a career expert. Suggest up to 8 Reddit subreddits that would be genuinely useful for someone targeting a "${targetRole}" role.
+${industriesText}
+${gapsText}
 
 Rules:
-- Return exactly 5 socialGroups and 6 forums
-- Prioritize niche, specific communities over broad ones
-- Every "whyRelevant" MUST reference either the target role (${targetRole}) or a specific gap from: ${topGaps.slice(0, 5).join(", ") || "general career development"}
-- For Reddit: use format https://reddit.com/r/subredditname
-- For Discord: use invite links or community landing pages
-- For Slack: use the community's join page
-- URLs must be real and currently active
+- Only suggest subreddits that DEFINITELY exist (e.g. r/cscareerquestions, r/datascience, r/learnprogramming — well-known, high-traffic subreddits)
+- Do NOT invent subreddits. If you are not certain it exists, omit it.
+- Format each as exactly: https://reddit.com/r/subredditname (no trailing slash)
+- Return a JSON array of objects: [{ "name": "r/subredditname", "description": "one sentence", "whyRelevant": "why this helps with their role or a specific gap" }]
 - Return only valid JSON, no markdown`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    temperature: 0.4,
-  });
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    });
 
-  const raw = JSON.parse(response.choices[0].message.content || "{}");
+    const raw = JSON.parse(response.choices[0].message.content || "{}");
+    const candidates: Array<{ name: string; description: string; whyRelevant: string }> =
+      Array.isArray(raw) ? raw : (raw.subreddits || raw.communities || raw.forums || []);
 
-  const socialGroups: SocialGroup[] = (raw.socialGroups || []).map(
-    (g: any, i: number) => ({
-      id: `sg-${i}`,
-      name: g.name || "Professional Group",
-      platform: g.platform === "Facebook" ? "Facebook" : "LinkedIn",
-      description: g.description || "",
-      whyRelevant: g.whyRelevant || "",
-      url: g.url || "https://linkedin.com",
-      memberCount: g.memberCount,
-    })
-  );
+    if (!candidates.length) return [];
 
-  const forums: CommunityForum[] = (raw.forums || []).map(
-    (f: any, i: number) => ({
-      id: `fo-${i}`,
-      name: f.name || "Professional Community",
-      platform: (["Reddit", "Slack", "Discord", "Forum"].includes(f.platform)
-        ? f.platform
-        : "Other") as CommunityForum["platform"],
-      description: f.description || "",
-      whyRelevant: f.whyRelevant || "",
-      url: f.url || "https://reddit.com",
-    })
-  );
+    const subreddits = candidates.map((c) => {
+      const match = c.name.match(/r\/([a-zA-Z0-9_]+)/);
+      const slug = match ? match[1] : c.name.replace(/^r\//, "");
+      return { ...c, url: `https://www.reddit.com/r/${slug}` };
+    });
 
-  return { socialGroups, forums };
+    const validated = await Promise.all(
+      subreddits.map(async (s, i) => {
+        const ok = await validateUrl(s.url);
+        if (!ok) return null;
+        return {
+          id: `fo-${i}`,
+          name: s.name.startsWith("r/") ? s.name : `r/${s.name}`,
+          platform: "Reddit" as const,
+          description: s.description,
+          whyRelevant: s.whyRelevant,
+          url: s.url,
+        };
+      })
+    );
+
+    return validated.filter((f): f is CommunityForum => f !== null);
+  } catch (err: any) {
+    console.error("Failed to generate Reddit suggestions:", err.message);
+    return [];
+  }
 }
 
 export async function getNetworkingRecommendations(
@@ -238,9 +268,10 @@ export async function getNetworkingRecommendations(
         .map((g) => g.area || g.skill || g.description || String(g))
     : [];
 
-  const [events, { socialGroups, forums }] = await Promise.all([
+  const [events, socialGroups, forums] = await Promise.all([
     fetchEventbriteEvents(targetRole, industries, location),
-    generateCommunityRecommendations(targetRole, industries, topGaps, location),
+    buildSocialGroupSearchLinks(targetRole, industries, topGaps),
+    fetchValidatedRedditCommunities(targetRole, industries, topGaps),
   ]);
 
   return {
