@@ -2,6 +2,21 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// ── result cache ──────────────────────────────────────────────────────────────
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const resultCache = new Map<string, { data: NetworkingRecommendations; expiresAt: number }>();
+
+function cacheKey(role: string, industries: string[], location: string): string {
+  return [role, ...industries, location].join("|").toLowerCase();
+}
+
+function pruneCache(): void {
+  const now = Date.now();
+  for (const [k, v] of resultCache) {
+    if (v.expiresAt < now) resultCache.delete(k);
+  }
+}
+
 export interface NetworkingEvent {
   id: string;
   name: string;
@@ -260,17 +275,30 @@ export async function getNetworkingRecommendations(
         .map((g) => g.area || g.skill || g.description || String(g))
     : [];
 
+  const key = cacheKey(targetRole, industries, location);
+  const cached = resultCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    console.log(`[networking] cache hit for "${key}"`);
+    return cached.data;
+  }
+
   const [events, socialGroups, forums] = await Promise.all([
     fetchEvents(targetRole, location),
     fetchSocialGroups(targetRole, industries),
     fetchForums(targetRole, topGaps),
   ]);
 
-  return {
+  const result: NetworkingRecommendations = {
     events,
     socialGroups,
     forums,
     generatedAt: new Date().toISOString(),
     userContext: { targetRole, location, topGaps },
   };
+
+  pruneCache();
+  resultCache.set(key, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
+  console.log(`[networking] cached result for "${key}" (expires in 30 min)`);
+
+  return result;
 }
