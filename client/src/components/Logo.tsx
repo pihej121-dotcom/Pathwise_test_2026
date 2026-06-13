@@ -1,6 +1,4 @@
-import logoImageLight from "@assets/pathwise-logo-light.svg";
-import logoImageDark from "@assets/pathwise-logo-dark.svg";
-import { useTheme } from "@/contexts/ThemeContext";
+import logoImage from "@assets/Pathwise_Logo_BlackP_copy_1781385203200.png";
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
@@ -8,22 +6,18 @@ interface LogoProps {
 }
 
 export function Logo({ size = "md", className = "" }: LogoProps) {
-  const { theme } = useTheme();
-  
   const sizeClasses = {
-    sm: "h-12 w-12",
-    md: "h-16 w-16", 
-    lg: "h-24 w-24"
+    sm: "h-10 w-10",
+    md: "h-14 w-14",
+    lg: "h-20 w-20",
   };
-
-  const logoImage = theme === "dark" ? logoImageDark : logoImageLight;
 
   return (
     <div className={`flex items-center justify-center ${className}`}>
-      <img 
+      <img
         src={logoImage}
         alt="Pathwise Logo"
-        className={`${sizeClasses[size]} object-contain`}
+        className={`${sizeClasses[size]} object-contain rounded-xl`}
         data-testid="pathwise-logo"
       />
     </div>
