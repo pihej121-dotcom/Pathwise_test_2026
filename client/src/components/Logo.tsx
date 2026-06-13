@@ -1,5 +1,5 @@
-import logoImageLight from "@assets/Pathwise_Logo_BlackP_1761100602134.png";
-import logoImageDark from "@assets/Pathwise_Logo_WhiteP_1761100602133.png";
+import logoImageLight from "@assets/pathwise-logo-light.svg";
+import logoImageDark from "@assets/pathwise-logo-dark.svg";
 import { useTheme } from "@/contexts/ThemeContext";
 
 interface LogoProps {

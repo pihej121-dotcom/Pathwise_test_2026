@@ -5,7 +5,7 @@ import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || "your-secret-key";
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export interface AuthRequest extends Request {

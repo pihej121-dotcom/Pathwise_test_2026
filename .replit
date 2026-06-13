@@ -1,7 +1,8 @@
-modules = ["nodejs-20", "web", "swift-5.8"]
+modules = ["nodejs-20", "web", "swift-5.8", "python-3.11"]
 [agent]
 expertMode = true
 integrations = ["resend:1.0.0"]
+stack = "FULLSTACK_JS"
 
 [nix]
 channel = "stable-25_05"
@@ -34,47 +35,7 @@ waitForPort = 5000
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 37671
-externalPort = 6000
-
-[[ports]]
-localPort = 43271
-externalPort = 3002
-
-[[ports]]
-localPort = 43367
-externalPort = 3000
-
-[[ports]]
-localPort = 43521
-externalPort = 3001
-
-[[ports]]
-localPort = 43531
-externalPort = 5173
-
-[[ports]]
-localPort = 44099
-externalPort = 8008
-
-[[ports]]
-localPort = 44793
-externalPort = 3003
-
-[[ports]]
-localPort = 45609
-externalPort = 5000
-
-[[ports]]
-localPort = 46037
-externalPort = 4200
-
-[[ports]]
-localPort = 46661
-externalPort = 6800
-
 [deployment]
 deploymentTarget = "autoscale"
-run = ["npm", "run", "start"]
+run = ["node", "./dist/index.cjs"]
 build = ["npm", "run", "build"]
