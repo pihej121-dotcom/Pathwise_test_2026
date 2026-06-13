@@ -1,0 +1,20 @@
+Update the ChatHome layout to more closely match a traditional chatbot interface. Four changes:
+
+1. Move recent/prior conversations into a persistent LEFT SIDEBAR.
+- Currently the recent conversations (savedSessions) render in the center welcome screen. Move them into a left sidebar that's visible alongside the chat, like ChatGPT/Claude.
+- The sidebar should list the saved sessions (prompt text + date), with the click-to-resume behavior they already have (resumeSession).
+- Include a "New chat" action at the top of the sidebar (reuse the existing resetChat).
+- On desktop the sidebar is fixed/visible; on mobile it should collapse behind a toggle (hamburger) so it doesn't crowd the screen. Make sure the main chat area still centers nicely (keep the existing max-w-3xl content column).
+- This sidebar only applies to logged-in users (sessions are per-user). Guests don't need it.
+
+2. Make the Quick tools larger.
+- Increase the size of the quick-tool buttons (Resume Analysis, Job Match, Career Match, Networking, Mock Interview, etc.) — larger padding, slightly larger text and icons — so they're more prominent and tappable. Keep them in the same place on the welcome screen for now; just scale them up.
+
+3. Make the Pathwise logo larger.
+- Bump the Logo in the header up a size (e.g. from size="sm" to size="md" or equivalent).
+
+4. Remove the "Interview Prep" quick-tool button from ChatHome.
+- Mock Interview now covers interview practice, so the standalone Interview Prep button is redundant. Remove ONLY the Interview Prep button from the quick-tools list (and any "Interview Prep" buttons in the post-completion CTA sections if present).
+- IMPORTANT: do NOT remove the underlying interview question-generation logic (the aiService.generateInterviewQuestions function or the interview goal handling). Mock Interview reuses that code, so it must stay. This is a UI button removal only.
+
+Keep everything else working: the chat flow, all other tools, message rendering, and localStorage session saving are unchanged. This is a layout/styling change only — do not alter any conversation logic, goal detection, or API calls beyond removing the one Interview Prep button.
