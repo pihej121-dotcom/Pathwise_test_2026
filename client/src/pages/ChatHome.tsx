@@ -39,7 +39,16 @@ import {
   Download,
   CheckCircle2,
   DollarSign,
+  Users,
+  Calendar,
+  MapPin,
+  Target,
+  Globe,
+  Wifi,
+  Building2,
+  RefreshCw,
 } from "lucide-react";
+import { SiLinkedin, SiFacebook, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Logo } from "@/components/Logo";
@@ -84,11 +93,29 @@ type CollectedData = {
   tailoredCoverLetter: string;
 };
 
+interface NetworkingEvent {
+  id: string; name: string; description: string; whyRelevant: string;
+  url: string; date: string; location: string; isOnline: boolean;
+}
+interface SocialGroup {
+  id: string; name: string; platform: "LinkedIn" | "Facebook";
+  description: string; whyRelevant: string; url: string; memberCount?: string;
+}
+interface CommunityForum {
+  id: string; name: string; platform: "Reddit" | "Slack" | "Discord" | "Forum" | "Other";
+  description: string; whyRelevant: string; url: string;
+}
+interface NetworkingRecommendations {
+  events: NetworkingEvent[]; socialGroups: SocialGroup[]; forums: CommunityForum[];
+  generatedAt: string; userContext: { targetRole: string; location: string; topGaps: string[] };
+}
+
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  networkingData?: NetworkingRecommendations;
 };
 
 // Targeting questions specifically for resume score flow
@@ -330,6 +357,46 @@ export default function ChatHome() {
       await simulateAssistantReply(
         `Got it! I can help with that. Let me ask you a couple of quick questions so I can give you a personalized response.\n\n${allQuestions[0].question}`
       );
+    }
+  };
+
+  const handleNetworkingClick = async () => {
+    addMessage("user", "Find me networking opportunities — events, groups, and communities for my career");
+    setCurrentSessionPrompt("Find me networking opportunities");
+    setState("generating" as ConversationState);
+    setIsTyping(true);
+
+    try {
+      const res = await fetch("/api/networking/recommendations", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to fetch networking recommendations");
+      }
+
+      const data: NetworkingRecommendations = await res.json();
+      setIsTyping(false);
+
+      const ctx = data.userContext;
+      const intro = `Here are personalized networking opportunities for **${ctx.targetRole || "your career"}**${ctx.location ? ` near ${ctx.location}` : ""}${ctx.topGaps.length ? `, focusing on your gaps: ${ctx.topGaps.slice(0, 3).join(", ")}` : ""}.`;
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: intro,
+          timestamp: new Date(),
+          networkingData: data,
+        },
+      ]);
+      setState("complete");
+    } catch (err: any) {
+      setIsTyping(false);
+      await simulateAssistantReply(`Sorry, I couldn't load networking recommendations right now. ${err.message || "Please try again."}`);
+      setState("complete");
     }
   };
 
@@ -1401,6 +1468,14 @@ End with a candid, constructive closing note. If their expectations need adjusti
                       {label}
                     </button>
                   ))}
+                  <button
+                    onClick={handleNetworkingClick}
+                    data-testid="button-networking-quick-tool"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-950/20 hover:border-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-xs text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 transition-all"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    Networking
+                  </button>
                 </div>
               </div>
             )}
@@ -1477,15 +1552,24 @@ End with a candid, constructive closing note. If their expectations need adjusti
                     <User className="w-4 h-4" />
                   )}
                 </div>
-                <div
-                  className={`max-w-[88%] rounded-2xl text-sm leading-relaxed ${
-                    msg.role === "assistant"
-                      ? "bg-card border border-border/60 text-foreground rounded-tl-sm shadow-sm px-5 py-4"
-                      : "bg-primary text-primary-foreground rounded-tr-sm px-4 py-2.5"
-                  }`}
-                >
-                  <MessageContent content={msg.content} />
-                </div>
+                {msg.networkingData ? (
+                  <div className="flex-1 min-w-0 max-w-[92%]">
+                    <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm shadow-sm px-5 py-4 text-sm mb-3">
+                      <MessageContent content={msg.content} />
+                    </div>
+                    <NetworkingPanel data={msg.networkingData} />
+                  </div>
+                ) : (
+                  <div
+                    className={`max-w-[88%] rounded-2xl text-sm leading-relaxed ${
+                      msg.role === "assistant"
+                        ? "bg-card border border-border/60 text-foreground rounded-tl-sm shadow-sm px-5 py-4"
+                        : "bg-primary text-primary-foreground rounded-tr-sm px-4 py-2.5"
+                    }`}
+                  >
+                    <MessageContent content={msg.content} />
+                  </div>
+                )}
               </div>
             ))}
 
@@ -1839,6 +1923,150 @@ function MicroProjectButton({ title }: { title: string }) {
       )}
       Generate Micro Project: {title}
     </button>
+  );
+}
+
+function PlatformIcon({ platform }: { platform: string }) {
+  switch (platform) {
+    case "LinkedIn": return <SiLinkedin className="w-3.5 h-3.5 text-[#0A66C2]" />;
+    case "Facebook": return <SiFacebook className="w-3.5 h-3.5 text-[#1877F2]" />;
+    case "Reddit": return <SiReddit className="w-3.5 h-3.5 text-[#FF4500]" />;
+    case "Slack": return <SiSlack className="w-3.5 h-3.5 text-[#4A154B]" />;
+    case "Discord": return <SiDiscord className="w-3.5 h-3.5 text-[#5865F2]" />;
+    default: return <Globe className="w-3.5 h-3.5 text-muted-foreground" />;
+  }
+}
+
+function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
+  return (
+    <div className="space-y-5" data-testid="networking-panel">
+      {/* Events */}
+      {data.events.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Calendar className="w-4 h-4 text-orange-500" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Local &amp; Online Events
+            </span>
+            <span className="text-xs bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 rounded-full px-1.5 py-0.5">{data.events.length}</span>
+          </div>
+          <div className="space-y-2">
+            {data.events.map((evt) => (
+              <div key={evt.id} className="bg-card border border-border/60 rounded-xl p-3 text-sm" data-testid={`networking-event-${evt.id}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                      {evt.isOnline
+                        ? <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 rounded px-1.5 py-0.5"><Wifi className="w-3 h-3" />Online</span>
+                        : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5"><Building2 className="w-3 h-3" />In-Person</span>}
+                    </div>
+                    <p className="font-medium text-sm leading-snug">{evt.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{evt.description}</p>
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1.5">
+                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{evt.date}</span>
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{evt.location}</span>
+                    </div>
+                    <div className="flex items-start gap-1 mt-1.5 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 rounded px-2 py-1">
+                      <Target className="w-3 h-3 mt-0.5 shrink-0" /><span>{evt.whyRelevant}</span>
+                    </div>
+                  </div>
+                  <a href={evt.url} target="_blank" rel="noopener noreferrer" data-testid={`link-event-${evt.id}`}>
+                    <button className="shrink-0 inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all">
+                      View <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Social Groups */}
+      {data.socialGroups.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <SiLinkedin className="w-4 h-4 text-[#0A66C2]" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              LinkedIn &amp; Facebook Groups
+            </span>
+            <span className="text-xs bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 rounded-full px-1.5 py-0.5">{data.socialGroups.length}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+            <Sparkles className="w-3 h-3" /> AI-curated — verify links before joining
+          </p>
+          <div className="space-y-2">
+            {data.socialGroups.map((grp) => (
+              <div key={grp.id} className="bg-card border border-border/60 rounded-xl p-3 text-sm" data-testid={`networking-group-${grp.id}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <PlatformIcon platform={grp.platform} />
+                      <span className="text-xs text-muted-foreground">{grp.platform}</span>
+                      {grp.memberCount && <span className="text-xs text-muted-foreground">· {grp.memberCount}</span>}
+                    </div>
+                    <p className="font-medium text-sm leading-snug">{grp.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{grp.description}</p>
+                    <div className="flex items-start gap-1 mt-1.5 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 rounded px-2 py-1">
+                      <Target className="w-3 h-3 mt-0.5 shrink-0" /><span>{grp.whyRelevant}</span>
+                    </div>
+                  </div>
+                  <a href={grp.url} target="_blank" rel="noopener noreferrer" data-testid={`link-group-${grp.id}`}>
+                    <button className="shrink-0 inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all">
+                      Join <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Forums */}
+      {data.forums.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <MessageSquare className="w-4 h-4 text-indigo-500" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Forums &amp; Communities
+            </span>
+            <span className="text-xs bg-indigo-100 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 rounded-full px-1.5 py-0.5">{data.forums.length}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+            <Sparkles className="w-3 h-3" /> AI-curated — verify links before joining
+          </p>
+          <div className="space-y-2">
+            {data.forums.map((frm) => (
+              <div key={frm.id} className="bg-card border border-border/60 rounded-xl p-3 text-sm" data-testid={`networking-forum-${frm.id}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <PlatformIcon platform={frm.platform} />
+                      <span className="text-xs text-muted-foreground">{frm.platform}</span>
+                    </div>
+                    <p className="font-medium text-sm leading-snug">{frm.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{frm.description}</p>
+                    <div className="flex items-start gap-1 mt-1.5 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 rounded px-2 py-1">
+                      <Target className="w-3 h-3 mt-0.5 shrink-0" /><span>{frm.whyRelevant}</span>
+                    </div>
+                  </div>
+                  <a href={frm.url} target="_blank" rel="noopener noreferrer" data-testid={`link-forum-${frm.id}`}>
+                    <button className="shrink-0 inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all">
+                      Join <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground text-right">
+        Updated {new Date(data.generatedAt).toLocaleString()}
+      </p>
+    </div>
   );
 }
 
