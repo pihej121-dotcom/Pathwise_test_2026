@@ -3991,6 +3991,34 @@ Make your recommendations specific, actionable, and data-driven based on the act
     }
   });
 
+  // ── Networking Recommendations ─────────────────────────────────────────────
+  app.get("/api/networking/recommendations", authenticate, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+
+      // Get user's active resume for gaps
+      const activeResume = await storage.getActiveResume(user.id);
+      const gaps = activeResume?.gaps ?? [];
+
+      const targetRole = user.targetRole || (activeResume?.targetRole as string) || "professional";
+      const industries: string[] = (user.industries as string[]) || [];
+      const location: string = user.location || "";
+
+      const { getNetworkingRecommendations } = await import("./networking");
+      const recommendations = await getNetworkingRecommendations(
+        targetRole,
+        industries,
+        Array.isArray(gaps) ? gaps : [],
+        location
+      );
+
+      res.json(recommendations);
+    } catch (err: any) {
+      console.error("Networking recommendations error:", err.message);
+      res.status(500).json({ error: err.message || "Failed to generate networking recommendations" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

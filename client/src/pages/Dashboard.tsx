@@ -62,7 +62,8 @@ import {
   Quote,
   CheckCircle2,
   User,
-  Heart
+  Heart,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -76,6 +77,7 @@ import MicroProjects from "./MicroProjects";
 import { AICopilot } from "./AICopilot";
 import Applications from "./Applications";
 import { InterviewPrep } from "./InterviewPrep";
+import Networking from "./Networking";
 
 const contactFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -1717,6 +1719,20 @@ export default function Dashboard() {
         </Card>
 
         <Card 
+          className={`cursor-pointer hover:shadow-lg transition-all w-full sm:w-[calc(50%-0.5rem)] md:w-[calc(33.333%-0.67rem)] lg:w-[calc(25%-0.75rem)] ${selectedCard === 'networking' ? 'ring-2 ring-violet-500 shadow-lg' : ''}`} 
+          onClick={() => handleCardSelect('networking')} 
+          data-testid="card-networking"
+        >
+          <CardContent className="pt-6 text-center">
+            <div className="w-12 h-12 bg-violet-100 dark:bg-violet-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Users className="w-6 h-6 text-violet-600" />
+            </div>
+            <h3 className="font-semibold mb-1">Networking</h3>
+            <p className="text-xs text-muted-foreground">Events, groups & communities</p>
+          </CardContent>
+        </Card>
+
+        <Card 
           className={`cursor-pointer hover:shadow-lg transition-all w-full sm:w-[calc(50%-0.5rem)] md:w-[calc(33.333%-0.67rem)] lg:w-[calc(25%-0.75rem)] ${selectedCard === 'about' ? 'ring-2 ring-teal-500 shadow-lg' : ''}`} 
           onClick={() => handleCardSelect('about')} 
           data-testid="card-about"
@@ -1980,6 +1996,8 @@ export default function Dashboard() {
         return <Applications />;
       case 'interview':
         return <InterviewPrep />;
+      case 'networking':
+        return <Networking />;
       case 'about':
         return <AboutUsContent />;
       case 'contact':

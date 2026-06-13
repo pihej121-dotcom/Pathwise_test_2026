@@ -24,6 +24,7 @@ import MicroProjects from "@/pages/MicroProjects";
 import { AICopilot } from "@/pages/AICopilot";
 import Applications from "@/pages/Applications";
 import { InterviewPrep } from "@/pages/InterviewPrep";
+import Networking from "@/pages/Networking";
 import AdminDashboard from "@/pages/AdminDashboard";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
 import InstitutionAdminDashboard from "@/pages/InstitutionAdminDashboard";
@@ -137,6 +138,7 @@ function Router() {
       <Route path="/ai-copilot" component={() => <ProtectedRoute component={() => <AICopilot />} studentOnly />} />
       <Route path="/applications" component={() => <ProtectedRoute component={() => <Applications />} studentOnly />} />
       <Route path="/interview-prep" component={() => <ProtectedRoute component={() => <InterviewPrep />} studentOnly />} />
+      <Route path="/networking" component={() => <ProtectedRoute component={() => <Networking />} studentOnly />} />
       
       {/* Super Admin routes */}
       <Route path="/admin/dashboard" component={() => <ProtectedRoute component={SuperAdminDashboard} superAdminOnly />} />
