@@ -39,3 +39,8 @@ externalPort = 80
 deploymentTarget = "autoscale"
 run = ["node", "./dist/index.cjs"]
 build = ["npm", "run", "build"]
+
+[userenv]
+
+[userenv.shared]
+SEARXNG_URL = "https://searxng-production-9a5e.up.railway.app"

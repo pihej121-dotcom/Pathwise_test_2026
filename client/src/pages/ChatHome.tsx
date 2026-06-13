@@ -96,10 +96,12 @@ type CollectedData = {
 interface NetworkingEvent {
   id: string; name: string; description: string; whyRelevant: string;
   url: string; date: string; location: string; isOnline: boolean;
+  source: "eventbrite" | "meetup" | "other";
 }
 interface SocialGroup {
   id: string; name: string; platform: "LinkedIn" | "Facebook";
-  description: string; whyRelevant: string; url: string; memberCount?: string;
+  description: string; whyRelevant: string; url: string;
+  requiresLogin?: boolean;
 }
 interface CommunityForum {
   id: string; name: string; platform: "Reddit" | "Slack" | "Discord" | "Forum" | "Other";
@@ -1959,6 +1961,12 @@ function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
                       {evt.isOnline
                         ? <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 rounded px-1.5 py-0.5"><Wifi className="w-3 h-3" />Online</span>
                         : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5"><Building2 className="w-3 h-3" />In-Person</span>}
+                      {evt.source === "meetup" && (
+                        <span className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded px-1.5 py-0.5">Meetup</span>
+                      )}
+                      {evt.source === "eventbrite" && (
+                        <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 rounded px-1.5 py-0.5">Eventbrite</span>
+                      )}
                     </div>
                     <p className="font-medium text-sm leading-snug">{evt.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{evt.description}</p>
@@ -2002,8 +2010,12 @@ function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
                     <div className="flex items-center gap-1.5 mb-1">
                       <PlatformIcon platform={grp.platform} />
                       <span className="text-xs text-muted-foreground">{grp.platform}</span>
+                      {grp.requiresLogin && (
+                        <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded px-1.5 py-0.5">Login required</span>
+                      )}
                     </div>
-                    <p className="font-medium text-sm leading-snug">{grp.description}</p>
+                    <p className="font-medium text-sm leading-snug">{grp.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{grp.description}</p>
                     <div className="flex items-start gap-1 mt-1.5 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 rounded px-2 py-1">
                       <Target className="w-3 h-3 mt-0.5 shrink-0" /><span>{grp.whyRelevant}</span>
                     </div>
