@@ -1,0 +1,18 @@
+Change the networking intake to collect background the same way the resume analysis and other chat flows do. Right now networking asks separate step-by-step questions (student vs professional "type", major, gradYear, experience, school, company). Replace that with the single combined background question those other flows use.
+
+The networking intake should ask, in order:
+1. Target role (keep this, it's required): "What role are you targeting? (e.g. Software Engineer, Product Manager, Data Analyst)"
+2. The SAME combined background question used in the other flows, word for word: "Tell me a bit about yourself — what's your school year (or years of experience), major/field, and university (or current company)?"
+3. A short location question (needed for local events): "What city or area should I search for local events in?"
+4. Offer the resume the same way the other flows do, optional: "Almost there! Please share your resume — upload a file or paste the text directly below. If you don't have one ready, just type 'skip'." Support file upload or paste, and allow skip. (If a resume is given, use it to inform relevance; if skipped, proceed without it.)
+
+Remove the separate intake steps for type, major, gradYear, experience, school, and company. All of that now comes from the single free-text background answer.
+
+Data passing:
+- Stop sending the separate structured params (intakeMajor, intakeSchool, intakeCompany, intakeGradYear, intakeYearsExp).
+- Instead send: target role, the free-text background answer, the location, and the resume text if provided.
+- The GPT keyword-generation step should extract whatever it needs (major, field, school, experience level) from the free-text background, the same way the analysis flows pass the raw background to the AI. Do not require structured fields.
+
+Keep everything else the same: SearXNG for Reddit/Discord/Slack/events (events use the location), LinkedIn pre-filled search link, no Facebook, never invent a URL, links validated. Do not persist anything to the database, keep using session state only, consistent with the other flows.
+
+Confirm the plan, then build.

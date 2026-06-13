@@ -69,25 +69,19 @@ type ConversationState =
 interface NetworkingIntake {
   steps: string[];
   stepIndex: number;
-  isStudent: boolean | null;
   collected: {
     targetRole?: string;
-    isStudent?: boolean;
-    gradYear?: number;
-    yearsOfExperience?: number;
-    major?: string;
-    school?: string;
-    company?: string;
+    background?: string;
+    location?: string;
+    resumeText?: string;
   };
 }
 
 interface NetworkingParams {
   intakeRole?: string;
-  intakeMajor?: string;
-  intakeSchool?: string;
-  intakeCompany?: string;
-  intakeGradYear?: number;
-  intakeYearsExp?: number;
+  intakeBackground?: string;
+  intakeLocation?: string;
+  intakeResumeText?: string;
 }
 
 type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "general" | null;
@@ -391,44 +385,44 @@ export default function ChatHome() {
 
   // ── networking intake helpers ────────────────────────────────────────────────
 
-  function getIntakeQuestion(step: string, isStudent: boolean | null): string {
+  function getIntakeQuestion(step: string): string {
     switch (step) {
-      case "role": return "What role are you targeting? *(e.g. Software Engineer, Product Manager, Data Analyst)*";
-      case "type": return "Are you currently a **student** or a **working professional**?";
-      case "gradYear": return "What year do you graduate? *(e.g. 2026, 2027)*";
-      case "experience": return "How many years of professional experience do you have?";
-      case "major": return "What's your major or field of study?";
-      case "school": return "Which university do you attend?";
-      case "company": return "Which company do you currently work at?";
-      default: return "Tell me a bit more about your background.";
+      case "role":
+        return "What role are you targeting? *(e.g. Software Engineer, Product Manager, Data Analyst)*";
+      case "background":
+        return "Tell me a bit about yourself — what's your school year (or years of experience), major/field, and university (or current company)?";
+      case "location":
+        return "What city or area should I search for local events in?";
+      case "resume":
+        return "Almost there! Please share your resume — upload a file or paste the text directly below.\n\nIf you don't have one ready, just type **skip**.";
+      default:
+        return "Tell me a bit more about your background.";
     }
   }
 
   // Networking intake always asks all questions from scratch — no DB lookups.
-  function buildIntakeSteps(): { steps: string[]; isStudent: boolean | null } {
-    return { steps: ["role", "type", "major"], isStudent: null };
-  }
-
-  function buildNetworkingUrl(params: NetworkingParams, force = false): string {
-    const p = new URLSearchParams();
-    if (force) p.set("force", "true");
-    if (params.intakeRole) p.set("intakeRole", params.intakeRole);
-    if (params.intakeMajor) p.set("intakeMajor", params.intakeMajor);
-    if (params.intakeSchool) p.set("intakeSchool", params.intakeSchool);
-    if (params.intakeCompany) p.set("intakeCompany", params.intakeCompany);
-    if (params.intakeGradYear != null) p.set("intakeGradYear", String(params.intakeGradYear));
-    if (params.intakeYearsExp != null) p.set("intakeYearsExp", String(params.intakeYearsExp));
-    const qs = p.toString();
-    return `/api/networking/recommendations${qs ? "?" + qs : ""}`;
+  function buildIntakeSteps(): string[] {
+    return ["role", "background", "location", "resume"];
   }
 
   const doFetchNetworking = async (forceRefresh = false) => {
     setState("generating");
     setIsTyping(true);
     try {
-      const url = buildNetworkingUrl(networkingParamsRef.current, forceRefresh);
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      const params = networkingParamsRef.current;
+      const res = await fetch("/api/networking/recommendations", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          force: forceRefresh,
+          intakeRole: params.intakeRole,
+          intakeBackground: params.intakeBackground,
+          intakeLocation: params.intakeLocation,
+          intakeResumeText: params.intakeResumeText,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -466,62 +460,30 @@ export default function ChatHome() {
       case "role":
         intake.collected.targetRole = text;
         break;
-      case "type": {
-        const lower = text.toLowerCase();
-        const isStud =
-          lower.includes("student") || lower.includes("study") ||
-          lower.includes("university") || lower.includes("college") ||
-          lower.includes("school") || lower.includes("graduating") ||
-          lower.includes("grad");
-        intake.isStudent = isStud;
-        intake.collected.isStudent = isStud;
-        const insertAt = intake.stepIndex + 1;
-        if (isStud) {
-          intake.steps.splice(insertAt, 0, "gradYear");
-          intake.steps.push("school");
-        } else {
-          intake.steps.splice(insertAt, 0, "experience");
-          intake.steps.push("company");
-        }
+      case "background":
+        intake.collected.background = text;
         break;
-      }
-      case "gradYear": {
-        const match = text.match(/\b(20\d{2})\b/);
-        intake.collected.gradYear = match ? parseInt(match[1], 10) : new Date().getFullYear() + 1;
+      case "location":
+        intake.collected.location = text;
         break;
-      }
-      case "experience": {
-        const match = text.match(/\d+/);
-        intake.collected.yearsOfExperience = match ? parseInt(match[0], 10) : 0;
-        break;
-      }
-      case "major":
-        intake.collected.major = text;
-        break;
-      case "school":
-        intake.collected.school = text;
-        break;
-      case "company":
-        intake.collected.company = text;
+      case "resume":
+        intake.collected.resumeText = text.toLowerCase() === "skip" ? "" : text;
         break;
     }
 
     intake.stepIndex += 1;
 
     if (intake.stepIndex < intake.steps.length) {
-      const nextStep = intake.steps[intake.stepIndex];
-      await simulateAssistantReply(getIntakeQuestion(nextStep, intake.isStudent));
+      await simulateAssistantReply(getIntakeQuestion(intake.steps[intake.stepIndex]));
       return;
     }
 
     // All answered — store in session ref (not DB) and fetch
     networkingParamsRef.current = {
       intakeRole: intake.collected.targetRole,
-      intakeMajor: intake.collected.major,
-      intakeSchool: intake.collected.school,
-      intakeCompany: intake.collected.company,
-      intakeGradYear: intake.collected.gradYear,
-      intakeYearsExp: intake.collected.yearsOfExperience,
+      intakeBackground: intake.collected.background,
+      intakeLocation: intake.collected.location,
+      intakeResumeText: intake.collected.resumeText || undefined,
     };
     networkingIntakeRef.current = null;
 
@@ -534,13 +496,12 @@ export default function ChatHome() {
     setCurrentSessionPrompt("Find me networking opportunities");
 
     networkingParamsRef.current = {};
-    const { steps, isStudent } = buildIntakeSteps();
-    networkingIntakeRef.current = { steps, stepIndex: 0, isStudent, collected: {} };
+    const steps = buildIntakeSteps();
+    networkingIntakeRef.current = { steps, stepIndex: 0, collected: {} };
     setState("networking_intake");
 
-    const firstQ = getIntakeQuestion(steps[0], isStudent);
     await simulateAssistantReply(
-      `I'll find networking opportunities tailored to your profile. Just a few quick questions first!\n\n${firstQ}`
+      `I'll find networking opportunities tailored to your profile. Just a few quick questions first!\n\n${getIntakeQuestion(steps[0])}`
     );
   };
 
@@ -1341,6 +1302,11 @@ End with a candid, constructive closing note. If their expectations need adjusti
       return;
     }
 
+    if (state === "networking_intake") {
+      await handleNetworkingIntakeAnswer(resumeText);
+      return;
+    }
+
     if (data.goal === "job_match") {
       const updatedData = { ...data, resumeText };
       setData(updatedData);
@@ -1395,11 +1361,17 @@ End with a candid, constructive closing note. If their expectations need adjusti
     URL.revokeObjectURL(url);
   };
 
-  const showFileUpload = state === "resume_upload";
+  const networkingOnResumeStep =
+    state === "networking_intake" &&
+    networkingIntakeRef.current != null &&
+    networkingIntakeRef.current.steps[networkingIntakeRef.current.stepIndex] === "resume";
+
+  const showFileUpload = state === "resume_upload" || networkingOnResumeStep;
 
   const getInputPlaceholder = () => {
     if (state === "idle") return "Tell me what you need help with…";
     if (state === "resume_upload") return "Paste your resume text, or type \"skip\"…";
+    if (networkingOnResumeStep) return "Paste your resume text, or type \"skip\"…";
     if (state === "job_details") return "Paste the job URL or qualifications/responsibilities…";
     if (state === "job_posting") return "Paste the full job posting text here (or a URL)…";
     if (state === "targeting") {
@@ -1707,9 +1679,20 @@ End with a candid, constructive closing note. If their expectations need adjusti
                     <NetworkingPanel
                       data={msg.networkingData}
                       onRefresh={async () => {
-                        const url = buildNetworkingUrl(networkingParamsRef.current, true);
-                        const res = await fetch(url, {
-                          headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+                        const params = networkingParamsRef.current;
+                        const res = await fetch("/api/networking/recommendations", {
+                          method: "POST",
+                          headers: {
+                            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            force: true,
+                            intakeRole: params.intakeRole,
+                            intakeBackground: params.intakeBackground,
+                            intakeLocation: params.intakeLocation,
+                            intakeResumeText: params.intakeResumeText,
+                          }),
                         });
                         if (!res.ok) {
                           const err = await res.json().catch(() => ({}));

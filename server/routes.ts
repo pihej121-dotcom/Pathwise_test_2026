@@ -3992,7 +3992,7 @@ Make your recommendations specific, actionable, and data-driven based on the act
   });
 
   // ── Networking Recommendations ─────────────────────────────────────────────
-  app.get("/api/networking/recommendations", authenticate, async (req: AuthRequest, res) => {
+  app.post("/api/networking/recommendations", authenticate, async (req: AuthRequest, res) => {
     try {
       const user = req.user!;
 
@@ -4000,33 +4000,36 @@ Make your recommendations specific, actionable, and data-driven based on the act
       const activeResume = await storage.getActiveResume(user.id);
       const gaps = activeResume?.gaps ?? [];
 
-      const targetRole = user.targetRole || (activeResume?.targetRole as string) || "professional";
       const industries: string[] = (user.industries as string[]) || [];
-      const location: string = user.location || "";
 
-      const force = req.query.force === "true";
+      // Intake answers from the POST body (session-only, not persisted to DB)
+      const {
+        force = false,
+        intakeRole,
+        intakeBackground,
+        intakeLocation,
+        intakeResumeText,
+      } = req.body as {
+        force?: boolean;
+        intakeRole?: string;
+        intakeBackground?: string;
+        intakeLocation?: string;
+        intakeResumeText?: string;
+      };
 
-      // Intake answers passed from the client as query params (not persisted to DB)
-      const intakeRole = (req.query.intakeRole as string) || undefined;
-      const intakeMajor = (req.query.intakeMajor as string) || undefined;
-      const intakeSchool = (req.query.intakeSchool as string) || undefined;
-      const intakeCompany = (req.query.intakeCompany as string) || undefined;
-      const intakeGradYear = req.query.intakeGradYear ? parseInt(req.query.intakeGradYear as string, 10) : undefined;
-      const intakeYearsExp = req.query.intakeYearsExp ? parseInt(req.query.intakeYearsExp as string, 10) : undefined;
+      const targetRole = intakeRole || user.targetRole || (activeResume?.targetRole as string) || "professional";
+      const location: string = intakeLocation || user.location || "";
 
       const { getNetworkingRecommendations } = await import("./networking");
       const recommendations = await getNetworkingRecommendations(
-        intakeRole || targetRole,
+        targetRole,
         industries,
         Array.isArray(gaps) ? gaps : [],
         location,
-        force,
+        !!force,
         {
-          major: intakeMajor || user.major || undefined,
-          school: intakeSchool || user.school || undefined,
-          currentCompany: intakeCompany,
-          gradYear: intakeGradYear || user.gradYear || undefined,
-          yearsOfExperience: intakeYearsExp,
+          background: intakeBackground,
+          resumeText: intakeResumeText,
         }
       );
 

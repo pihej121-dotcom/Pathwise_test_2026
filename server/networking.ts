@@ -67,16 +67,13 @@ export interface UserNetworkingProfile {
   industries: string[];
   topGaps: string[];
   location: string;
-  major?: string;
-  school?: string;
-  currentCompany?: string;
-  gradYear?: number;
-  yearsOfExperience?: number;
+  background?: string;   // free-text from intake (major, school/company, experience level, etc.)
+  resumeText?: string;   // optional resume paste
 }
 
 interface SearchKeywords {
   groupKeywords: string;   // for LinkedIn URL + Reddit/Discord/Slack SearXNG
-  eventKeywords: string;   // for Eventbrite/Meetup SearXNG (location appended separately)
+  eventKeywords: string;   // for Eventbrite/Meetup SearXNG (location appended at search time)
 }
 
 interface SearXNGResult {
@@ -90,37 +87,32 @@ interface SearXNGResult {
 export async function generateSearchKeywords(
   profile: UserNetworkingProfile
 ): Promise<SearchKeywords> {
-  const isStudent = profile.gradYear
-    ? profile.gradYear >= new Date().getFullYear()
-    : !profile.yearsOfExperience;
-
-  const context = [
+  const contextParts = [
     `Target role: ${profile.targetRole}`,
-    profile.industries.length ? `Industries: ${profile.industries.join(", ")}` : "",
-    profile.major ? `Major/field: ${profile.major}` : "",
-    isStudent && profile.school ? `University: ${profile.school}` : "",
-    !isStudent && profile.currentCompany ? `Current company: ${profile.currentCompany}` : "",
-    isStudent && profile.gradYear ? `Graduating: ${profile.gradYear}` : "",
-    !isStudent && profile.yearsOfExperience ? `Years of experience: ${profile.yearsOfExperience}` : "",
+    profile.industries.length ? `Industries of interest: ${profile.industries.join(", ")}` : "",
+    profile.background ? `Background (may include school year, major, university, company, experience level): ${profile.background}` : "",
     profile.topGaps.length ? `Skills to develop: ${profile.topGaps.slice(0, 4).join(", ")}` : "",
+    profile.resumeText ? `Resume excerpt: ${profile.resumeText.slice(0, 600)}` : "",
   ]
     .filter(Boolean)
     .join("\n");
 
-  const prompt = `You are a career expert generating search keywords for a ${isStudent ? "student" : "working professional"}.
+  const prompt = `You are a career expert generating search keywords for networking recommendations.
 
 User profile:
-${context}
+${contextParts}
 
-Generate two sets of search keywords:
+From the background description and resume excerpt, extract whatever is relevant (major/field, school or company, experience level, career stage) to inform the keywords. Do NOT ask for missing information — work with what's provided.
 
-1. GROUP/COMMUNITY keywords: For LinkedIn groups, Reddit, Discord, and Slack communities. Topic/role focused — NO location. Use professional terminology. ${isStudent ? "Include student/early-career/alumni angles where appropriate." : "Use industry/professional-level terms."}
+Generate two search keyword phrases:
 
-2. EVENT keywords: For Eventbrite and Meetup event searches. Topic/role focused — NO location (location is added separately). Use terms that would appear in event titles.
+1. GROUP/COMMUNITY keywords: For LinkedIn groups, Reddit, Discord, and Slack. Topic/role focused — NO location. Use professional terminology relevant to their career stage and field.
+
+2. EVENT keywords: For Eventbrite and Meetup event searches. Topic/role focused — NO location (location is appended separately by the backend).
 
 Rules:
 - Output ONLY keyword strings — no URLs, no descriptions, no explanations.
-- Each keyword set should be 3–6 words, suitable for a search engine query.
+- Each phrase should be 3–6 words, suitable as a search engine query.
 - Keep them specific, not generic ("machine learning engineers" > "tech professionals").
 
 Return exactly this JSON:
