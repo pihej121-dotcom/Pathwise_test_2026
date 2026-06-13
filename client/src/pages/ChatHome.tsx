@@ -77,8 +77,17 @@ interface NetworkingIntake {
     yearsOfExperience?: number;
     major?: string;
     school?: string;
-    currentCompany?: string;
+    company?: string;
   };
+}
+
+interface NetworkingParams {
+  intakeRole?: string;
+  intakeMajor?: string;
+  intakeSchool?: string;
+  intakeCompany?: string;
+  intakeGradYear?: number;
+  intakeYearsExp?: number;
 }
 
 type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "general" | null;
@@ -314,6 +323,7 @@ export default function ChatHome() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const networkingIntakeRef = useRef<NetworkingIntake | null>(null);
+  const networkingParamsRef = useRef<NetworkingParams>({});
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -394,59 +404,29 @@ export default function ChatHome() {
     }
   }
 
-  function buildIntakeSteps(u: typeof user): { steps: string[]; isStudent: boolean | null } {
-    const steps: string[] = [];
-    let isStudent: boolean | null = null;
-
-    if (!u?.targetRole) steps.push("role");
-
-    if (u?.gradYear) {
-      isStudent = true;
-    } else if (u?.yearsOfExperience != null) {
-      isStudent = false;
-    } else {
-      steps.push("type");
-    }
-
-    if (!u?.major) steps.push("major");
-
-    if (isStudent === true && !u?.school) steps.push("school");
-    if (isStudent === false && !u?.currentCompany) steps.push("company");
-
-    return { steps, isStudent };
+  // Networking intake always asks all questions from scratch — no DB lookups.
+  function buildIntakeSteps(): { steps: string[]; isStudent: boolean | null } {
+    return { steps: ["role", "type", "major"], isStudent: null };
   }
 
-  const saveIntakeToProfile = async (collected: NetworkingIntake["collected"]) => {
-    const body: Record<string, any> = {};
-    if (collected.targetRole) body.targetRole = collected.targetRole;
-    if (collected.gradYear) body.gradYear = collected.gradYear;
-    if (collected.yearsOfExperience != null) body.yearsOfExperience = collected.yearsOfExperience;
-    if (collected.major) body.major = collected.major;
-    if (collected.school) body.school = collected.school;
-    if (collected.currentCompany) body.currentCompany = collected.currentCompany;
-    if (Object.keys(body).length === 0) return;
-    try {
-      await fetch("/api/users/settings", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    } catch (e: any) {
-      console.error("[intake] profile save failed:", e.message);
-    }
-  };
+  function buildNetworkingUrl(params: NetworkingParams, force = false): string {
+    const p = new URLSearchParams();
+    if (force) p.set("force", "true");
+    if (params.intakeRole) p.set("intakeRole", params.intakeRole);
+    if (params.intakeMajor) p.set("intakeMajor", params.intakeMajor);
+    if (params.intakeSchool) p.set("intakeSchool", params.intakeSchool);
+    if (params.intakeCompany) p.set("intakeCompany", params.intakeCompany);
+    if (params.intakeGradYear != null) p.set("intakeGradYear", String(params.intakeGradYear));
+    if (params.intakeYearsExp != null) p.set("intakeYearsExp", String(params.intakeYearsExp));
+    const qs = p.toString();
+    return `/api/networking/recommendations${qs ? "?" + qs : ""}`;
+  }
 
   const doFetchNetworking = async (forceRefresh = false) => {
     setState("generating");
     setIsTyping(true);
     try {
-      const url = forceRefresh
-        ? "/api/networking/recommendations?force=true"
-        : "/api/networking/recommendations";
+      const url = buildNetworkingUrl(networkingParamsRef.current, forceRefresh);
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
       });
@@ -497,11 +477,11 @@ export default function ChatHome() {
         intake.collected.isStudent = isStud;
         const insertAt = intake.stepIndex + 1;
         if (isStud) {
-          if (!user?.gradYear) intake.steps.splice(insertAt, 0, "gradYear");
-          if (!user?.school) intake.steps.push("school");
+          intake.steps.splice(insertAt, 0, "gradYear");
+          intake.steps.push("school");
         } else {
-          if (!user?.yearsOfExperience) intake.steps.splice(insertAt, 0, "experience");
-          if (!user?.currentCompany) intake.steps.push("company");
+          intake.steps.splice(insertAt, 0, "experience");
+          intake.steps.push("company");
         }
         break;
       }
@@ -522,7 +502,7 @@ export default function ChatHome() {
         intake.collected.school = text;
         break;
       case "company":
-        intake.collected.currentCompany = text;
+        intake.collected.company = text;
         break;
     }
 
@@ -534,9 +514,18 @@ export default function ChatHome() {
       return;
     }
 
-    await simulateAssistantReply("Got it! Let me find the best networking opportunities for you…", 400);
-    await saveIntakeToProfile(intake.collected);
+    // All answered — store in session ref (not DB) and fetch
+    networkingParamsRef.current = {
+      intakeRole: intake.collected.targetRole,
+      intakeMajor: intake.collected.major,
+      intakeSchool: intake.collected.school,
+      intakeCompany: intake.collected.company,
+      intakeGradYear: intake.collected.gradYear,
+      intakeYearsExp: intake.collected.yearsOfExperience,
+    };
     networkingIntakeRef.current = null;
+
+    await simulateAssistantReply("Got it! Let me find the best networking opportunities for you…", 400);
     await doFetchNetworking();
   };
 
@@ -544,13 +533,8 @@ export default function ChatHome() {
     addMessage("user", "Find me networking opportunities — events, groups, and communities for my career");
     setCurrentSessionPrompt("Find me networking opportunities");
 
-    const { steps, isStudent } = buildIntakeSteps(user);
-
-    if (steps.length === 0) {
-      await doFetchNetworking();
-      return;
-    }
-
+    networkingParamsRef.current = {};
+    const { steps, isStudent } = buildIntakeSteps();
     networkingIntakeRef.current = { steps, stepIndex: 0, isStudent, collected: {} };
     setState("networking_intake");
 
@@ -1723,7 +1707,8 @@ End with a candid, constructive closing note. If their expectations need adjusti
                     <NetworkingPanel
                       data={msg.networkingData}
                       onRefresh={async () => {
-                        const res = await fetch("/api/networking/recommendations?force=true", {
+                        const url = buildNetworkingUrl(networkingParamsRef.current, true);
+                        const res = await fetch(url, {
                           headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
                         });
                         if (!res.ok) {

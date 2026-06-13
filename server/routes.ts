@@ -519,8 +519,6 @@ if (existingUser && !existingUser.isActive) {
         targetRole: z.string().optional(),
         location: z.string().optional(),
         remoteOk: z.boolean().optional(),
-        currentCompany: z.string().optional(),
-        yearsOfExperience: z.number().int().min(0).max(60).optional(),
       });
 
       const validated = settingsSchema.parse(updateData);
@@ -4007,19 +4005,28 @@ Make your recommendations specific, actionable, and data-driven based on the act
       const location: string = user.location || "";
 
       const force = req.query.force === "true";
+
+      // Intake answers passed from the client as query params (not persisted to DB)
+      const intakeRole = (req.query.intakeRole as string) || undefined;
+      const intakeMajor = (req.query.intakeMajor as string) || undefined;
+      const intakeSchool = (req.query.intakeSchool as string) || undefined;
+      const intakeCompany = (req.query.intakeCompany as string) || undefined;
+      const intakeGradYear = req.query.intakeGradYear ? parseInt(req.query.intakeGradYear as string, 10) : undefined;
+      const intakeYearsExp = req.query.intakeYearsExp ? parseInt(req.query.intakeYearsExp as string, 10) : undefined;
+
       const { getNetworkingRecommendations } = await import("./networking");
       const recommendations = await getNetworkingRecommendations(
-        targetRole,
+        intakeRole || targetRole,
         industries,
         Array.isArray(gaps) ? gaps : [],
         location,
         force,
         {
-          major: user.major || undefined,
-          school: user.school || undefined,
-          currentCompany: (user as any).currentCompany || undefined,
-          gradYear: user.gradYear || undefined,
-          yearsOfExperience: (user as any).yearsOfExperience || undefined,
+          major: intakeMajor || user.major || undefined,
+          school: intakeSchool || user.school || undefined,
+          currentCompany: intakeCompany,
+          gradYear: intakeGradYear || user.gradYear || undefined,
+          yearsOfExperience: intakeYearsExp,
         }
       );
 
