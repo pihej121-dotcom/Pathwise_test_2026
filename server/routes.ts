@@ -2405,13 +2405,14 @@ Make your recommendations specific, actionable, and data-driven based on the act
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+      const { maxTokens } = req.body;
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 1200,
+        max_tokens: typeof maxTokens === "number" ? maxTokens : 3000,
         temperature: 0.7,
       });
 

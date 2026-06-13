@@ -84,7 +84,7 @@ interface NetworkingParams {
   intakeResumeText?: string;
 }
 
-type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "general" | null;
+type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "career_match" | "general" | null;
 
 type UserProfile = {
   background: string; // raw answer to the background question
@@ -200,6 +200,7 @@ const FOLLOW_UP_QUESTIONS: Record<string, { key: string; question: string }[]> =
 function detectGoal(message: string): GoalType {
   const lower = message.toLowerCase();
   if (lower.match(/salary|negotiat|raise|promotion|pay|compensation|offer.*negot|counter.?offer|increment|wage|pay.?raise|pay.?increase/)) return "salary_negotiation";
+  if (lower.match(/career match|what careers fit|careers for me|career suggestions|best career.*me|careers based on|suggest.*careers|what should i do with my|careers.*resume|match.*career/)) return "career_match";
   if (lower.match(/job match|match.*job|match.*position|match.*role|fit.*job|qualify.*job|how.*competitive|stack up|apply to|job posting|hiring/)) return "job_match";
   if (lower.match(/competi|qualify|fit for/)) return "competitiveness";
   if (lower.match(/readiness|ready|career readiness|assess|prepared/)) return "readiness";
@@ -344,6 +345,18 @@ export default function ChatHome() {
   const handleInitialMessage = async (text: string) => {
     addMessage("user", text);
     const goal = detectGoal(text);
+
+    // Career Match: skip background questions, go straight to resume upload
+    if (goal === "career_match") {
+      setData((prev) => ({ ...prev, userMessage: text, goal, answers: {} }));
+      setState("resume_upload");
+      setCurrentSessionPrompt(text);
+      await simulateAssistantReply(
+        "I'll scan your resume and match you with careers that genuinely fit your background — no target role needed.\n\nPlease share your resume — upload a file (PDF, DOCX, TXT) or paste the text directly below."
+      );
+      return;
+    }
+
     const allQuestions = FOLLOW_UP_QUESTIONS[goal!] || FOLLOW_UP_QUESTIONS.general;
 
     // If we already have user profile, pre-fill the background answer and skip that question
@@ -546,6 +559,17 @@ export default function ChatHome() {
   const handleResumeInput = async (text: string) => {
     const resumeText = text.toLowerCase() === "skip" ? "" : text;
     setData((prev) => ({ ...prev, resumeText }));
+
+    if (data.goal === "career_match") {
+      if (!resumeText.trim()) {
+        await simulateAssistantReply(
+          "Career Match needs your resume to work — without it I have nothing to match careers against!\n\nPlease upload a file (PDF, DOCX, TXT) using the paperclip button, or paste your resume text directly below."
+        );
+        return;
+      }
+      await generateCareerMatch({ ...data, resumeText });
+      return;
+    }
 
     if (data.goal === "job_match") {
       setState("job_posting");
@@ -851,6 +875,89 @@ export default function ChatHome() {
           "I had trouble generating your full score. Let me give you some quick feedback instead:\n\n## Quick Resume Tips\n- Quantify your achievements with numbers and metrics\n- Tailor keywords to match your target role and industry\n- Keep it to 1 page (or 2 for 10+ years of experience)\n- Add a strong summary section at the top\n- Highlight relevant skills in a dedicated sections\n\nSign in to get your full AI-powered score and track your progress!"
         );
       }
+      setState("complete");
+    }
+  };
+
+  const generateCareerMatch = async (finalData: CollectedData) => {
+    setState("generating");
+    await simulateAssistantReply("Great — I have your resume! Matching careers now… ✨", 600);
+    setIsTyping(true);
+
+    try {
+      const systemPrompt = `You are an expert career counselor and talent strategist. Your task is to analyze a candidate's resume and identify the best-fitting career paths based purely on evidence in the resume.
+
+Rules:
+- Base ALL suggestions solely on what is in the resume: skills, experience, education, projects, certifications, achievements.
+- Do NOT ask about interests or invent details not present in the resume.
+- Cite specific, real content from the resume in each explanation — actual job titles, companies, tools, skills, degrees, projects.
+- Be honest: scores should reflect genuine alignment. 90+ means the resume is almost tailor-made for that career. Don't inflate scores.
+- For each career, note both why it fits well AND any stretch areas or gaps the candidate would need to address.
+- Format every response using markdown. Use ## for career headers, **bold** for key terms.`;
+
+      const userPrompt = `Analyze the resume below and suggest 5–7 career paths that best fit this candidate, ranked from highest to lowest fit.
+
+For each career, provide:
+1. A specific career/role title (e.g. "Product Manager" not just "Business")
+2. A fit score out of 100 in the header
+3. A detailed explanation (at least 3–4 sentences) that:
+   - Cites specific evidence from the resume (tools, job titles, companies, skills, achievements, degrees, projects)
+   - Explains WHY this career fits based on that evidence
+   - Honestly notes any stretch areas or skills the candidate would need to develop
+
+Use exactly this format for each entry:
+
+## [Career Title] — [score]/100
+
+[Detailed explanation...]
+
+---
+
+After all careers, add:
+
+## 🔍 Resume Signal Summary
+
+[2–3 sentences summarizing what the resume most strongly signals overall]
+
+Resume:
+---
+${finalData.resumeText}
+---`;
+
+      const res = await fetch("/api/ai/career-analysis", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("auth_token")
+            ? { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
+            : {}),
+        },
+        body: JSON.stringify({ systemPrompt, userPrompt, maxTokens: 3000 }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to generate career matches");
+      }
+
+      const { analysis } = await res.json();
+      setIsTyping(false);
+      addMessage("assistant", analysis);
+      setState("complete");
+
+      if (user) {
+        const updated = saveSession(
+          user.id,
+          currentSessionPrompt || finalData.userMessage,
+          [...messages]
+        );
+        setSavedSessions(updated);
+      }
+    } catch (err: any) {
+      setIsTyping(false);
+      await simulateAssistantReply(
+        `Sorry, I ran into a problem generating your career matches. ${err.message || "Please try again."}`
+      );
       setState("complete");
     }
   };
@@ -1307,6 +1414,11 @@ End with a candid, constructive closing note. If their expectations need adjusti
       return;
     }
 
+    if (data.goal === "career_match") {
+      await generateCareerMatch({ ...data, resumeText });
+      return;
+    }
+
     if (data.goal === "job_match") {
       const updatedData = { ...data, resumeText };
       setData(updatedData);
@@ -1587,6 +1699,14 @@ End with a candid, constructive closing note. If their expectations need adjusti
                       {label}
                     </button>
                   ))}
+                  <button
+                    onClick={() => handleInitialMessage("Match careers to my resume based on my background")}
+                    data-testid="button-career-match-quick-tool"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-all"
+                  >
+                    <Target className="w-3.5 h-3.5" />
+                    Career Match
+                  </button>
                   <button
                     onClick={handleNetworkingClick}
                     data-testid="button-networking-quick-tool"
