@@ -48,7 +48,7 @@ import {
   Building2,
   RefreshCw,
 } from "lucide-react";
-import { SiLinkedin, SiFacebook, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
+import { SiLinkedin, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Logo } from "@/components/Logo";
@@ -99,7 +99,7 @@ interface NetworkingEvent {
   source: "eventbrite" | "meetup" | "other";
 }
 interface SocialGroup {
-  id: string; name: string; platform: "LinkedIn" | "Facebook";
+  id: string; name: string; platform: "LinkedIn";
   description: string; whyRelevant: string; url: string;
   requiresLogin?: boolean;
 }
@@ -1931,7 +1931,6 @@ function MicroProjectButton({ title }: { title: string }) {
 function PlatformIcon({ platform }: { platform: string }) {
   switch (platform) {
     case "LinkedIn": return <SiLinkedin className="w-3.5 h-3.5 text-[#0A66C2]" />;
-    case "Facebook": return <SiFacebook className="w-3.5 h-3.5 text-[#1877F2]" />;
     case "Reddit": return <SiReddit className="w-3.5 h-3.5 text-[#FF4500]" />;
     case "Slack": return <SiSlack className="w-3.5 h-3.5 text-[#4A154B]" />;
     case "Discord": return <SiDiscord className="w-3.5 h-3.5 text-[#5865F2]" />;
@@ -1996,11 +1995,11 @@ function NetworkingPanel({ data }: { data: NetworkingRecommendations }) {
           <div className="flex items-center gap-2 mb-2">
             <SiLinkedin className="w-4 h-4 text-[#0A66C2]" />
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              LinkedIn &amp; Facebook Groups
+              LinkedIn Groups
             </span>
           </div>
           <p className="text-xs text-muted-foreground mb-2">
-            Search results tailored to your role — browse and join groups directly on each platform.
+            Pre-filled LinkedIn group search for your role — browse and join groups after logging in.
           </p>
           <div className="space-y-2">
             {data.socialGroups.map((grp) => (

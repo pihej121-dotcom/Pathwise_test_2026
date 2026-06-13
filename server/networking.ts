@@ -174,70 +174,23 @@ export async function fetchSocialGroups(
   targetRole: string,
   industries: string[]
 ): Promise<SocialGroup[]> {
+  // LinkedIn only — always return a pre-filled search link (no SearXNG, no 200-check).
+  // Query is role/topic only; location is intentionally excluded for groups.
+  // encodeURIComponent ensures spaces become %20, not +.
   const terms = [targetRole, ...industries.slice(0, 1)].filter(Boolean).join(" ");
+  const encoded = encodeURIComponent(terms);
 
-  const [liResults, fbResults] = await Promise.all([
-    searxSearch(`site:linkedin.com/groups ${terms} professional`),
-    searxSearch(`site:facebook.com/groups ${terms}`),
-  ]);
-
-  const liCandidates = liResults
-    .filter((r) => r.url.includes("linkedin.com/groups"))
-    .slice(0, 5);
-
-  const fbCandidates = fbResults
-    .filter((r) => r.url.includes("facebook.com/groups"))
-    .slice(0, 5);
-
-  const allCandidates: Array<SearXNGResult & { platform: "LinkedIn" | "Facebook" }> = [
-    ...liCandidates.map((r) => ({ ...r, platform: "LinkedIn" as const })),
-    ...fbCandidates.map((r) => ({ ...r, platform: "Facebook" as const })),
+  return [
+    {
+      id: "sg-linkedin",
+      name: `LinkedIn Groups — ${terms}`,
+      platform: "LinkedIn",
+      description: `Browse LinkedIn groups for ${targetRole} professionals and related communities.`,
+      whyRelevant: `Connects you with peers, recruiters, and industry insiders in the ${targetRole} space${industries.length ? ` (${industries[0]})` : ""}.`,
+      url: `https://www.linkedin.com/search/results/groups/?keywords=${encoded}`,
+      requiresLogin: true,
+    },
   ];
-
-  const validated = await Promise.all(
-    allCandidates.map(async (r, i) => {
-      const ok = await validateUrl(r.url);
-      if (!ok) return null;
-      return {
-        id: `sg-${i}`,
-        name: r.title || `${r.platform} Group`,
-        platform: r.platform,
-        description: (r.content || "").slice(0, 180),
-        whyRelevant: `A ${r.platform} community for ${targetRole} professionals${industries.length ? ` in ${industries[0]}` : ""}.`,
-        url: r.url,
-        requiresLogin: true,
-      } satisfies SocialGroup;
-    })
-  );
-
-  const groups = validated.filter((g): g is SocialGroup => g !== null);
-
-  // If SearXNG returned nothing usable, fall back to real platform search URLs
-  if (groups.length === 0) {
-    const encoded = encodeURIComponent(terms);
-    return [
-      {
-        id: "sg-li-search",
-        name: `Search LinkedIn Groups for "${terms}"`,
-        platform: "LinkedIn",
-        description: `Browse LinkedIn groups for ${targetRole} professionals.`,
-        whyRelevant: `No specific groups were found via search — this takes you directly to LinkedIn's group search for your role.`,
-        url: `https://www.linkedin.com/search/results/groups/?keywords=${encoded}`,
-        requiresLogin: true,
-      },
-      {
-        id: "sg-fb-search",
-        name: `Search Facebook Groups for "${terms}"`,
-        platform: "Facebook",
-        description: `Discover Facebook groups for ${targetRole} professionals.`,
-        whyRelevant: `No specific groups were found via search — this takes you directly to Facebook's group search for your role.`,
-        url: `https://www.facebook.com/groups/search/?q=${encoded}`,
-        requiresLogin: true,
-      },
-    ];
-  }
-
-  return groups.slice(0, 4);
 }
 
 // ── forums ────────────────────────────────────────────────────────────────────
