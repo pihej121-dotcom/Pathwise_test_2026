@@ -2837,6 +2837,156 @@ Make your recommendations specific, actionable, and data-driven based on the act
 
 
 
+  // ── Mock Interview ──────────────────────────────────────────────────────────
+
+  app.post("/api/mock-interview/generate-questions", authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { role, category = "behavioral", count = 5 } = req.body;
+      if (!role) return res.status(400).json({ error: "Role is required" });
+
+      let questions: any[];
+      if (category === "mix") {
+        const [behavioral, technical, situational] = await Promise.all([
+          aiService.generateInterviewQuestions(role, "a leading company", "behavioral", 2),
+          aiService.generateInterviewQuestions(role, "a leading company", "technical", 2),
+          aiService.generateInterviewQuestions(role, "a leading company", "situational", 1),
+        ]);
+        questions = [...behavioral, ...technical, ...situational];
+      } else {
+        questions = await aiService.generateInterviewQuestions(role, "a leading company", category, count);
+      }
+      res.json(questions);
+    } catch (err: any) {
+      console.error("Mock interview generate-questions error:", err.message);
+      res.status(500).json({ error: err.message || "Failed to generate questions" });
+    }
+  });
+
+  app.post("/api/mock-interview/transcribe", authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { audio, mimeType = "audio/webm" } = req.body;
+      if (!audio) return res.status(400).json({ error: "Audio data is required" });
+
+      const { default: OpenAI, toFile } = await import("openai");
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const audioBuffer = Buffer.from(audio, "base64");
+      const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
+      const audioFile = await toFile(audioBuffer, `answer.${ext}`, { type: mimeType });
+
+      const response = await openai.audio.transcriptions.create({
+        file: audioFile,
+        model: "whisper-1",
+        response_format: "verbose_json",
+        timestamp_granularities: ["word"],
+      } as any);
+
+      res.json({ text: (response as any).text || "", words: (response as any).words || [] });
+    } catch (err: any) {
+      console.error("Mock interview transcribe error:", err.message);
+      res.status(500).json({ error: err.message || "Transcription failed" });
+    }
+  });
+
+  app.post("/api/mock-interview/critique", authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { role, answers } = req.body as {
+        role: string;
+        answers: Array<{
+          question: string;
+          transcript: string;
+          durationSeconds: number;
+          words: Array<{ word: string; start: number; end: number }>;
+        }>;
+      };
+      if (!answers?.length) return res.status(400).json({ error: "Answers are required" });
+
+      const FILLERS = ["um", "uh", "like", "you know", "basically", "literally", "right", "so", "kind of", "sort of", "i mean", "actually"];
+
+      const enriched = answers.map((a, i) => {
+        const wordCount = a.transcript.trim().split(/\s+/).filter(Boolean).length;
+        const wpm = a.durationSeconds > 5 ? Math.round(wordCount / (a.durationSeconds / 60)) : 0;
+        const lower = a.transcript.toLowerCase();
+        const fillerCounts: Record<string, number> = {};
+        for (const f of FILLERS) {
+          const matches = lower.match(new RegExp(`\\b${f}\\b`, "g"));
+          if (matches?.length) fillerCounts[f] = matches.length;
+        }
+        const totalFillers = Object.values(fillerCounts).reduce((s, n) => s + n, 0);
+        const longPauses: number[] = [];
+        if (Array.isArray(a.words) && a.words.length > 1) {
+          for (let j = 1; j < a.words.length; j++) {
+            const gap = a.words[j].start - a.words[j - 1].end;
+            if (gap >= 2) longPauses.push(Math.round(gap * 10) / 10);
+          }
+        }
+        return { number: i + 1, question: a.question, transcript: a.transcript, durationSeconds: a.durationSeconds, wordCount, wpm, fillerCounts, totalFillers, longPauses };
+      });
+
+      const systemPrompt = `You are an expert interview coach. Provide honest, specific, constructive feedback.
+Format your response using markdown: ## for section headers, **bold** for key terms, - for bullets. Cite evidence from the transcripts.
+Important: This analysis is based on transcript text and timing data only. Do NOT claim to assess tone, vocal energy, confidence, or body language.`;
+
+      const answersSummary = enriched.map(a => `---
+## Question ${a.number}: "${a.question}"
+Duration: ${a.durationSeconds}s | Words: ${a.wordCount} | WPM: ${a.wpm > 0 ? a.wpm : "N/A"}
+Filler words: ${a.totalFillers > 0 ? Object.entries(a.fillerCounts).map(([k, v]) => `"${k}" ×${v}`).join(", ") : "none detected"}
+Long pauses (>2s): ${a.longPauses.length > 0 ? a.longPauses.map((p: number) => `${p}s`).join(", ") : "none"}
+Transcript: "${a.transcript || "(no speech detected)"}"`).join("\n\n");
+
+      const userPrompt = `Role being practiced: **${role || "General"}**
+
+${answersSummary}
+
+---
+
+For EACH question provide:
+
+### Q[N] — Content
+- Relevance and completeness
+- Structure (STAR for behavioral; clear steps for technical)
+- Specificity (real examples and numbers vs. vague generalities)
+- Key strength and main gap
+
+### Q[N] — Delivery *(transcript-based)*
+- **Pace:** Comment on WPM (ideal 120–160; <100 slow; >180 rushed). If N/A, note answer was too brief.
+- **Fillers:** Note count and impact (under 3/min is fine; over 5/min is distracting)
+- **Length:** Too short (<60s) / appropriate (60–180s) / rambling (>180s)
+- **Pauses:** Any long pauses noted; thoughtful or hesitant?
+
+---
+
+After all questions provide:
+
+## 🎯 Overall Session Assessment
+
+**Top strengths (2–3):** across all answers
+**Top areas to improve (2–3):** with one concrete action per area
+**Practice recommendation:** one targeted drill for the biggest weakness
+
+End with a brief encouraging note.
+
+> *Note: This critique is based on transcript text and timing data only. Tone, vocal energy, and confidence assessment require audio analysis and are not included.*`;
+
+      const { default: OpenAI } = await import("openai");
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 4000,
+        temperature: 0.4,
+      });
+
+      const critique = completion.choices[0]?.message?.content || "Unable to generate critique.";
+      res.json({ critique });
+    } catch (err: any) {
+      console.error("Mock interview critique error:", err.message);
+      res.status(500).json({ error: err.message || "Failed to generate critique" });
+    }
+  });
+
   // Micro-Internship Marketplace routes - Skill Gap Analysis
   app.post("/api/skill-gaps", authenticate, async (req: AuthRequest, res) => {
     try {

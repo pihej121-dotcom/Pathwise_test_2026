@@ -47,8 +47,10 @@ import {
   Wifi,
   Building2,
   RefreshCw,
+  Video,
 } from "lucide-react";
 import { SiLinkedin, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
+import MockInterviewPanel, { type InterviewQuestion, type SessionAnswer } from "@/components/MockInterviewPanel";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Logo } from "@/components/Logo";
@@ -64,6 +66,7 @@ type ConversationState =
   | "targeting"
   | "generating"
   | "networking_intake"
+  | "mock_interview_intake"
   | "complete";
 
 interface NetworkingIntake {
@@ -84,7 +87,7 @@ interface NetworkingParams {
   intakeResumeText?: string;
 }
 
-type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "career_match" | "general" | null;
+type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "career_match" | "mock_interview" | "general" | null;
 
 type UserProfile = {
   background: string; // raw answer to the background question
@@ -137,6 +140,7 @@ type Message = {
   content: string;
   timestamp: Date;
   networkingData?: NetworkingRecommendations;
+  mockInterviewData?: { questions: InterviewQuestion[]; role: string };
 };
 
 // Targeting questions specifically for resume score flow
@@ -319,6 +323,8 @@ export default function ChatHome() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const networkingIntakeRef = useRef<NetworkingIntake | null>(null);
   const networkingParamsRef = useRef<NetworkingParams>({});
+  const mockInterviewIntakeRef = useRef<{ step: number; role?: string } | null>(null);
+  const mockInterviewRoleRef = useRef<string>("");
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -516,6 +522,117 @@ export default function ChatHome() {
     await simulateAssistantReply(
       `I'll find networking opportunities tailored to your profile. Just a few quick questions first!\n\n${getIntakeQuestion(steps[0])}`
     );
+  };
+
+  // ── Mock Interview handlers ──────────────────────────────────────────────
+
+  const handleMockInterviewClick = async () => {
+    addMessage("user", "I want to practice a mock interview");
+    setCurrentSessionPrompt("Mock Interview session");
+    mockInterviewIntakeRef.current = { step: 0 };
+    setState("mock_interview_intake");
+    await simulateAssistantReply(
+      "Let's set up your mock interview! I'll ask questions one at a time, record your answers, and give you a full critique at the end.\n\n**What role are you preparing for?** *(e.g. Software Engineer, Product Manager, Data Analyst)*"
+    );
+  };
+
+  const handleMockInterviewIntakeAnswer = async (text: string) => {
+    const intake = mockInterviewIntakeRef.current;
+    if (!intake) return;
+
+    if (intake.step === 0) {
+      intake.role = text;
+      intake.step = 1;
+      await simulateAssistantReply(
+        `Got it — **${text}** interview. What type of questions would you like?\n\n- **behavioral** — past experiences & teamwork\n- **technical** — role-specific skills & knowledge\n- **situational** — hypothetical problem-solving\n- **mix** — a blend of all three`
+      );
+    } else {
+      const raw = text.toLowerCase();
+      const category =
+        raw.includes("tech") ? "technical"
+        : raw.includes("situ") ? "situational"
+        : raw.includes("behav") ? "behavioral"
+        : raw.includes("mix") || raw.includes("all") || raw.includes("blend") ? "mix"
+        : "behavioral";
+
+      const role = intake.role || "Professional";
+      mockInterviewRoleRef.current = role;
+      mockInterviewIntakeRef.current = null;
+
+      await simulateAssistantReply("Generating your interview questions…", 400);
+      setState("generating");
+      setIsTyping(true);
+
+      try {
+        const res = await fetch("/api/mock-interview/generate-questions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+          body: JSON.stringify({ role, category, count: 5 }),
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.error || "Failed to generate questions");
+        }
+        const questions: InterviewQuestion[] = await res.json();
+        setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Here are your **5 ${category === "mix" ? "mixed" : category} interview questions** for a **${role}** role. Each question will be shown on screen and can be read aloud. Record your answer, then move to the next. Your full critique will appear when the session is complete.`,
+            timestamp: new Date(),
+            mockInterviewData: { questions, role },
+          },
+        ]);
+        setState("complete");
+      } catch (err: any) {
+        setIsTyping(false);
+        await simulateAssistantReply(
+          `Sorry, I couldn't generate interview questions. ${err.message || "Please try again."}`
+        );
+        setState("complete");
+      }
+    }
+  };
+
+  const handleMockInterviewSessionComplete = async (answers: SessionAnswer[]) => {
+    setState("generating");
+    setIsTyping(true);
+    try {
+      const res = await fetch("/api/mock-interview/critique", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
+        body: JSON.stringify({ role: mockInterviewRoleRef.current, answers }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || "Critique failed");
+      }
+      const { critique } = await res.json();
+      setIsTyping(false);
+      addMessage("assistant", critique);
+      setState("complete");
+      if (user) {
+        setMessages((prev) => {
+          const updated = saveSession(user.id, currentSessionPrompt, prev);
+          setSavedSessions(updated);
+          return prev;
+        });
+      }
+    } catch (err: any) {
+      setIsTyping(false);
+      await simulateAssistantReply(
+        `Sorry, I couldn't generate your critique. ${err.message || "Please try again."}`
+      );
+      setState("complete");
+    }
   };
 
   const resumeSession = (session: SavedSession) => {
@@ -1354,6 +1471,9 @@ End with a candid, constructive closing note. If their expectations need adjusti
     } else if (state === "networking_intake") {
       addMessage("user", text);
       await handleNetworkingIntakeAnswer(text);
+    } else if (state === "mock_interview_intake") {
+      addMessage("user", text);
+      await handleMockInterviewIntakeAnswer(text);
     }
   };
 
@@ -1484,6 +1604,11 @@ End with a candid, constructive closing note. If their expectations need adjusti
     if (state === "idle") return "Tell me what you need help with…";
     if (state === "resume_upload") return "Paste your resume text, or type \"skip\"…";
     if (networkingOnResumeStep) return "Paste your resume text, or type \"skip\"…";
+    if (state === "mock_interview_intake") {
+      return mockInterviewIntakeRef.current?.step === 0
+        ? "e.g. Software Engineer, Product Manager…"
+        : "behavioral / technical / situational / mix";
+    }
     if (state === "job_details") return "Paste the job URL or qualifications/responsibilities…";
     if (state === "job_posting") return "Paste the full job posting text here (or a URL)…";
     if (state === "targeting") {
@@ -1715,6 +1840,14 @@ End with a candid, constructive closing note. If their expectations need adjusti
                     <Users className="w-3.5 h-3.5" />
                     Networking
                   </button>
+                  <button
+                    onClick={handleMockInterviewClick}
+                    data-testid="button-mock-interview-quick-tool"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-xs text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-all"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    Mock Interview
+                  </button>
                 </div>
               </div>
             )}
@@ -1791,7 +1924,18 @@ End with a candid, constructive closing note. If their expectations need adjusti
                     <User className="w-4 h-4" />
                   )}
                 </div>
-                {msg.networkingData ? (
+                {msg.mockInterviewData ? (
+                  <div className="flex-1 min-w-0 max-w-[92%]">
+                    <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm shadow-sm px-5 py-4 text-sm mb-3">
+                      <MessageContent content={msg.content} />
+                    </div>
+                    <MockInterviewPanel
+                      questions={msg.mockInterviewData.questions}
+                      role={msg.mockInterviewData.role}
+                      onSessionComplete={handleMockInterviewSessionComplete}
+                    />
+                  </div>
+                ) : msg.networkingData ? (
                   <div className="flex-1 min-w-0 max-w-[92%]">
                     <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm shadow-sm px-5 py-4 text-sm mb-3">
                       <MessageContent content={msg.content} />
