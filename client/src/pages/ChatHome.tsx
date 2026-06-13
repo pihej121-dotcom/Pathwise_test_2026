@@ -310,6 +310,7 @@ export default function ChatHome() {
   const [isTyping, setIsTyping] = useState(false);
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [currentSessionPrompt, setCurrentSessionPrompt] = useState<string>("");
   const [resumeScore, setResumeScore] = useState<number | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -642,6 +643,7 @@ export default function ChatHome() {
     setMessages(session.messages);
     setCurrentSessionPrompt(session.prompt);
     setState("complete");
+    setActiveSessionId(session.id);
   };
 
   const handleCollectingAnswer = async (text: string) => {
@@ -1582,6 +1584,7 @@ End with a candid, constructive closing note. If their expectations need adjusti
     setIsTyping(false);
     setInputValue("");
     setCurrentSessionPrompt("");
+    setActiveSessionId(null);
   };
 
   const downloadTextFile = (content: string, filename: string) => {
@@ -1722,7 +1725,7 @@ End with a candid, constructive closing note. If their expectations need adjusti
                       <button
                         key={session.id}
                         onClick={() => { resumeSession(session); setSidebarOpen(false); }}
-                        className="w-full text-left px-2 py-2.5 rounded-lg hover:bg-muted/60 transition-colors"
+                        className={`w-full text-left px-2 py-2.5 rounded-lg transition-colors ${activeSessionId === session.id ? "bg-primary/10 font-medium" : "hover:bg-muted/60"}`}
                       >
                         <p className="text-xs text-foreground/90 truncate leading-snug">{session.prompt}</p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
