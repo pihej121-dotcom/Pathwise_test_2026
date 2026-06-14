@@ -70,6 +70,11 @@ export default function MockInterviewPanel({
   const mimeTypeRef = useRef("audio/webm");
   const answersRef = useRef<SessionAnswer[]>([]);
 
+  // OpenAI TTS: per-session cache (index → blob URL) and in-flight fetch promises
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCacheRef = useRef<Map<number, string>>(new Map());
+  const audioFetchesRef = useRef<Map<number, Promise<string | null>>>(new Map());
+
   useEffect(() => {
     return () => {
       stopAllTracks();
@@ -86,6 +91,7 @@ export default function MockInterviewPanel({
 
   async function startSession() {
     setError(null);
+    prefetchAudio(0); // pre-fetch first question audio while user grants permissions
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
@@ -109,7 +115,7 @@ export default function MockInterviewPanel({
     }
   }
 
-  function speakQuestion(text: string) {
+  function speakWithBrowser(text: string) {
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     utt.rate = 0.92;
@@ -119,8 +125,70 @@ export default function MockInterviewPanel({
     window.speechSynthesis.speak(utt);
   }
 
+  function fetchAudioUrl(index: number): Promise<string | null> {
+    if (audioCacheRef.current.has(index)) {
+      return Promise.resolve(audioCacheRef.current.get(index)!);
+    }
+    const existing = audioFetchesRef.current.get(index);
+    if (existing) return existing;
+
+    const promise = (async (): Promise<string | null> => {
+      try {
+        const res = await fetch("/api/mock-interview/speak", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+          body: JSON.stringify({ text: questions[index].question }),
+        });
+        if (!res.ok) throw new Error("TTS endpoint error");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        audioCacheRef.current.set(index, url);
+        return url;
+      } catch {
+        return null;
+      } finally {
+        audioFetchesRef.current.delete(index);
+      }
+    })();
+
+    audioFetchesRef.current.set(index, promise);
+    return promise;
+  }
+
+  function prefetchAudio(index: number) {
+    if (index >= 0 && index < questions.length && !audioCacheRef.current.has(index)) {
+      fetchAudioUrl(index); // fire-and-forget
+    }
+  }
+
+  async function speakQuestion(text: string, index: number) {
+    stopTTS();
+    setTtsActive(true);
+    try {
+      const url = await fetchAudioUrl(index);
+      if (!url) throw new Error("No audio URL");
+      const audio = new Audio(url);
+      ttsAudioRef.current = audio;
+      audio.onended = () => setTtsActive(false);
+      audio.onerror = () => {
+        setTtsActive(false);
+        speakWithBrowser(text);
+      };
+      await audio.play();
+    } catch {
+      speakWithBrowser(text);
+    }
+  }
+
   function stopTTS() {
     window.speechSynthesis.cancel();
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+    }
     setTtsActive(false);
   }
 
@@ -219,6 +287,8 @@ export default function MockInterviewPanel({
       answersRef.current = [...answersRef.current, answer];
       setCurrentTranscript(text);
       setPhase("reviewing");
+      // Pre-fetch next question's audio while user reviews their transcript
+      prefetchAudio(currentIndex + 1);
     } catch (err: any) {
       setError(err.message || "Transcription failed. Please try again.");
       setPhase("asking");
@@ -250,7 +320,7 @@ export default function MockInterviewPanel({
 
   function finishSession() {
     stopAllTracks();
-    window.speechSynthesis.cancel();
+    stopTTS();
     setPhase("done");
     onSessionComplete(answersRef.current);
   }
@@ -368,7 +438,7 @@ export default function MockInterviewPanel({
                 {phase === "asking" && (
                   <button
                     onClick={() =>
-                      ttsActive ? stopTTS() : speakQuestion(q.question)
+                      ttsActive ? stopTTS() : speakQuestion(q.question, currentIndex)
                     }
                     className="mt-2.5 flex items-center gap-1.5 text-xs text-primary hover:text-primary/70 transition-colors"
                   >

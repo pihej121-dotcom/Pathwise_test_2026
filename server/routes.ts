@@ -2898,6 +2898,27 @@ Make your recommendations specific, actionable, and data-driven based on the act
     }
   });
 
+  app.post("/api/mock-interview/speak", authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { text } = req.body;
+      if (!text) return res.status(400).json({ error: "text is required" });
+      const { default: OpenAI } = await import("openai");
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const response = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: "onyx",
+        input: String(text).slice(0, 4096),
+      });
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.set("Content-Type", "audio/mpeg");
+      res.set("Cache-Control", "no-store");
+      res.send(buffer);
+    } catch (err: any) {
+      console.error("Mock interview speak error:", err.message);
+      res.status(500).json({ error: err.message || "TTS failed" });
+    }
+  });
+
   app.post("/api/mock-interview/transcribe", authenticate, async (req: AuthRequest, res) => {
     try {
       const { audio, mimeType = "audio/webm" } = req.body;

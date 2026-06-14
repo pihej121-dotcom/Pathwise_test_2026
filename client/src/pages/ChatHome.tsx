@@ -1738,7 +1738,11 @@ End with a candid, constructive closing note. If their expectations need adjusti
     networkingIntakeRef.current != null &&
     networkingIntakeRef.current.steps[networkingIntakeRef.current.stepIndex] === "resume";
 
-  const showFileUpload = state === "resume_upload" || networkingOnResumeStep || state === "cv_converter_upload";
+  const showFileUpload =
+    state === "resume_upload" ||
+    networkingOnResumeStep ||
+    state === "cv_converter_upload" ||
+    (state === "mock_interview_intake" && (mockInterviewIntakeRef.current?.step ?? 0) === 2);
 
   const getInputPlaceholder = () => {
     if (state === "idle") return "Tell me what you need help with…";
