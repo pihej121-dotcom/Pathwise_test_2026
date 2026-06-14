@@ -3,7 +3,7 @@ import { Resend } from "resend";
 export interface EmailVerificationData {
   email: string;
   token: string;
-  institutionName: string;
+  institutionName?: string;
 }
 
 export interface InvitationEmailData {
@@ -79,16 +79,103 @@ export class EmailService {
     try {
       const { client, fromEmail } = getResendClient();
       const verificationUrl = `${this.getBaseUrl()}/verify-email?token=${data.token}`;
+      const displayName = data.institutionName || "Pathwise";
+
+      // Logo served as static asset; hardcoded to production domain for email clients.
+      const logoUrl = "https://pathwise.nyc/pathwise-logo.png";
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td align="center" style="background-color:#0f172a;padding:28px 40px;">
+              <img src="${logoUrl}" alt="Pathwise" width="48" height="48" style="display:block;border-radius:10px;" />
+              <p style="margin:10px 0 0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">Pathwise</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px 40px 28px;">
+              <h1 style="margin:0 0 20px;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3;">Confirm your email address</h1>
+              <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.6;">
+                Welcome to ${displayName}! Please verify your email address to activate your account and get started.
+              </p>
+
+              <!-- CTA button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr>
+                  <td align="center" style="border-radius:8px;background-color:#4f46e5;">
+                    <a href="${verificationUrl}"
+                       target="_blank"
+                       style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;background-color:#4f46e5;letter-spacing:0.1px;">
+                      Verify email address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Plain-text URL fallback -->
+              <p style="margin:0 0 6px;font-size:12px;color:#94a3b8;">Button not working? Copy and paste this link into your browser:</p>
+              <p style="margin:0 0 28px;font-size:12px;color:#4f46e5;word-break:break-all;">${verificationUrl}</p>
+
+              <!-- Divider -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr><td style="border-top:1px solid #e2e8f0;"></td></tr>
+              </table>
+
+              <!-- Security note -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-left:3px solid #e2e8f0;border-radius:0 6px 6px 0;padding:14px 16px;">
+                <tr>
+                  <td style="font-size:13px;color:#64748b;line-height:1.6;">
+                    <strong style="color:#475569;">Note:</strong> This link expires in <strong>24 hours</strong>. If you didn't create a Pathwise account, you can safely ignore this email.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="background-color:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.6;">
+                This email was sent by Pathwise &middot; <a href="https://pathwise.nyc" style="color:#94a3b8;text-decoration:underline;">pathwise.nyc</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      const text = `Welcome to ${displayName}!
+
+Please verify your email address to activate your Pathwise account:
+${verificationUrl}
+
+This link expires in 24 hours.
+
+If you didn't create a Pathwise account, you can safely ignore this email.
+
+---
+Pathwise · https://pathwise.nyc`;
 
       await client.emails.send({
         from: fromEmail,
         to: data.email,
-        subject: `Verify your email for ${data.institutionName}`,
-        html: `
-          <p>Welcome to <strong>${data.institutionName}</strong> on Pathwise!</p>
-          <p>Please verify your email by clicking below:</p>
-          <a href="${verificationUrl}" style="color:#667eea;">Verify Email</a>
-        `,
+        subject: `Verify your email for Pathwise`,
+        html,
+        text,
       });
 
       return true;

@@ -52,6 +52,14 @@ export default function Register() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Registration failed");
 
+      if (result.requiresVerification) {
+        const dest = result.email
+          ? `/verify-email?email=${encodeURIComponent(result.email)}`
+          : "/verify-email";
+        window.location.href = dest;
+        return;
+      }
+
       if (result.token) {
         localStorage.setItem("auth_token", result.token);
         window.location.href = "/";

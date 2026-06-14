@@ -29,6 +29,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
 import InstitutionAdminDashboard from "@/pages/InstitutionAdminDashboard";
 import TermsOfService from "@/pages/TermsOfService";
+import VerifyEmail from "@/pages/VerifyEmail";
 import NotFound from "@/pages/not-found";
 
 function ProtectedRoute({ component: Component, adminOnly = false, institutionAdminOnly = false, superAdminOnly = false, studentOnly = false }: { component: () => JSX.Element, adminOnly?: boolean, institutionAdminOnly?: boolean, superAdminOnly?: boolean, studentOnly?: boolean }) {
@@ -123,6 +124,7 @@ function Router() {
       <Route path="/checkout" component={Checkout} />
       <Route path="/checkout/success" component={CheckoutSuccess} />
       <Route path="/terms" component={TermsOfService} />
+      <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/chat" component={ChatHome} />
       
       {/* Role-based home route */}

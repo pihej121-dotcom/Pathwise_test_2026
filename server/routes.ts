@@ -171,8 +171,8 @@ if (existingUser && !existingUser.isActive) {
         gradYear,
         subscriptionTier,
         subscriptionStatus: subscriptionTier === 'paid' ? 'incomplete' : 'active',
-        isActive: true, // Auto-activate for invited users since email verification is temporarily disabled
-        isVerified: true // Auto-verify for invited users
+        isActive: !!(invitation || subscriptionTier === 'paid'),
+        isVerified: !!(invitation || subscriptionTier === 'paid'),
       });
 
       // Claim invitation if provided
@@ -270,15 +270,41 @@ if (existingUser && !existingUser.isActive) {
         });
       }
 
-      // For free/institutional users, auto-login as before
-      const token = generateToken();
-      await storage.createSession(user.id, token, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+      // Invited users → auto-login immediately (admin already vouched for them)
+      if (invitation) {
+        const token = generateToken();
+        await storage.createSession(user.id, token, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        return res.status(201).json({
+          message: "Registration successful! You can now log in.",
+          user: { ...user, password: undefined },
+          token,
+          requiresVerification: false,
+        });
+      }
 
-      res.status(201).json({
-        message: "Registration successful! You can now log in.",
-        user: { ...user, password: undefined },
-        token, // Include token for auto-login
-        requiresVerification: false
+      // Direct / domain-based signups → send verification email, no auto-login
+      const verificationToken = generateToken();
+      const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      await storage.createEmailVerification({
+        email: user.email,
+        token: verificationToken,
+        expiresAt: verificationExpiresAt,
+        isUsed: false,
+      });
+      let institutionDisplayName = "Pathwise";
+      if (institutionId) {
+        const inst = await storage.getInstitution(institutionId);
+        if (inst) institutionDisplayName = inst.name;
+      }
+      await emailService.sendEmailVerification({
+        email: user.email,
+        token: verificationToken,
+        institutionName: institutionDisplayName,
+      });
+      return res.status(201).json({
+        message: "Account created! Please check your email to verify your address.",
+        requiresVerification: true,
+        email: user.email,
       });
     } catch (error: any) {
       if (error.name === "ZodError") {
@@ -304,10 +330,9 @@ if (existingUser && !existingUser.isActive) {
         return res.status(401).json({ error: "Incorrect password" });
       }
 
-      // Temporarily disabled for development - email verification not implemented yet
-      // if (!user.isVerified) {
-      //   return res.status(401).json({ error: "Please verify your email first" });
-      // }
+      if (!user.isVerified) {
+        return res.status(401).json({ error: "Please verify your email before logging in. Check your inbox for a verification link." });
+      }
 
       const token = await createSession(user.id);
       
