@@ -1717,15 +1717,7 @@ End with a candid, constructive closing note. If their expectations need adjusti
               />
             )}
             <aside className={`fixed inset-y-0 left-0 z-40 bg-background border-r border-border/50 flex flex-col pt-14 transition-all duration-200 ease-in-out md:relative md:inset-auto md:z-auto md:pt-0 w-64 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${sidebarCollapsed ? "md:w-0 md:min-w-0 md:overflow-hidden md:border-r-0" : "md:w-64"}`}>
-              <div className="p-3 border-b border-border/50 flex-shrink-0 flex flex-col gap-2 min-w-[16rem]">
-                <button
-                  onClick={() => { resetChat(); setSidebarOpen(false); }}
-                  data-testid="button-new-chat-sidebar"
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 text-sm text-muted-foreground hover:text-foreground transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  New chat
-                </button>
+              <div className="p-3 border-b border-border/50 flex-shrink-0 min-w-[16rem]">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
                   <input
