@@ -6,6 +6,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1870,28 +1871,36 @@ End with a candid, constructive closing note. If their expectations need adjusti
             {user && (
               <div className="w-full max-w-xl">
                 <p className="text-xs text-muted-foreground mb-2.5 font-medium uppercase tracking-wide">Quick tools</p>
-                <div className="flex flex-wrap gap-2.5">
-                  {[
-                    { label: "Resume Analysis", icon: FileText, onClick: () => handleInitialMessage("Analyze my resume and give me detailed feedback"), cls: "border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/20 hover:border-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300" },
-                    { label: "Job Match Analysis", icon: Briefcase, onClick: () => handleInitialMessage("Help me find jobs that match my skills and experience — I want a job match score and tailored resume"), cls: "border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-950/20 hover:border-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-700 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300" },
-                    { label: "Career Roadmap", icon: Route, onClick: () => handleInitialMessage("Help me build a career roadmap for my goals"), cls: "border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/20 hover:border-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300" },
-                    { label: "Micro-Projects", icon: Zap, onClick: () => handleInitialMessage("Suggest portfolio projects I can build to strengthen my resume"), cls: "border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 hover:border-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300" },
-                    { label: "Salary Negotiation", icon: DollarSign, onClick: () => handleInitialMessage("Help me negotiate my salary — I want to understand my leverage and get a negotiation strategy"), cls: "border-green-200 dark:border-green-800/60 bg-green-50 dark:bg-green-950/20 hover:border-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300" },
-                    { label: "Career Match", icon: Target, onClick: () => handleInitialMessage("Match careers to my resume based on my background"), cls: "border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300", testId: "button-career-match-quick-tool" },
-                    { label: "Networking", icon: Users, onClick: handleNetworkingClick, cls: "border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-950/20 hover:border-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300", testId: "button-networking-quick-tool" },
-                    { label: "Mock Interview", icon: Video, onClick: handleMockInterviewClick, cls: "border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300", testId: "button-mock-interview-quick-tool" },
-                  ].map(({ label, icon: Icon, onClick, cls, testId }: { label: string; icon: React.FC<{ className?: string }>; onClick: () => void; cls: string; testId?: string }) => (
-                    <button
-                      key={label}
-                      onClick={onClick}
-                      data-testid={testId}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-all ${cls}`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                <TooltipProvider delayDuration={300}>
+                  <div className="flex flex-wrap gap-2.5">
+                    {[
+                      { label: "Resume Analysis", icon: FileText, onClick: () => handleInitialMessage("Analyze my resume and give me detailed feedback"), cls: "border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/20 hover:border-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300", tooltip: "Get a detailed score and section-by-section breakdown of your resume, with specific improvements and gaps to fix." },
+                      { label: "Job Match Analysis", icon: Briefcase, onClick: () => handleInitialMessage("Help me find jobs that match my skills and experience — I want a job match score and tailored resume"), cls: "border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-950/20 hover:border-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-700 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300", tooltip: "Paste a job posting to see how well you match, plus a tailored resume and cover letter for that role." },
+                      { label: "Career Roadmap", icon: Route, onClick: () => handleInitialMessage("Help me build a career roadmap for my goals"), cls: "border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/20 hover:border-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300", tooltip: "Get a structured 3–6 month plan to reach your target role, with milestones, skills, and resources." },
+                      { label: "Micro-Projects", icon: Zap, onClick: () => handleInitialMessage("Suggest portfolio projects I can build to strengthen my resume"), cls: "border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 hover:border-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300", tooltip: "Get portfolio project ideas tailored to your goals, with datasets, tutorials, and starter code to build them." },
+                      { label: "Salary Negotiation", icon: DollarSign, onClick: () => handleInitialMessage("Help me negotiate my salary — I want to understand my leverage and get a negotiation strategy"), cls: "border-green-200 dark:border-green-800/60 bg-green-50 dark:bg-green-950/20 hover:border-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300", tooltip: "Get a market-grounded negotiation strategy, leverage assessment, and a ready-to-use script or email." },
+                      { label: "Career Match", icon: Target, onClick: () => handleInitialMessage("Match careers to my resume based on my background"), cls: "border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300", testId: "button-career-match-quick-tool", tooltip: "Upload your resume and get a ranked list of careers that fit you, each with a score and detailed reasoning." },
+                      { label: "Networking", icon: Users, onClick: handleNetworkingClick, cls: "border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-950/20 hover:border-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300", testId: "button-networking-quick-tool", tooltip: "Find niche networking opportunities for your field: local events, LinkedIn groups, and online communities." },
+                      { label: "Mock Interview", icon: Video, onClick: handleMockInterviewClick, cls: "border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300", testId: "button-mock-interview-quick-tool", tooltip: "Practice a video interview that asks questions aloud, then critiques both what you said and how you said it." },
+                    ].map(({ label, icon: Icon, onClick, cls, testId, tooltip }: { label: string; icon: React.FC<{ className?: string }>; onClick: () => void; cls: string; testId?: string; tooltip: string }) => (
+                      <Tooltip key={label}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={onClick}
+                            data-testid={testId}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-all ${cls}`}
+                          >
+                            <Icon className="w-4 h-4" />
+                            {label}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[220px] text-center text-xs leading-snug">
+                          {tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </TooltipProvider>
               </div>
             )}
 

@@ -1,0 +1,19 @@
+Add hover descriptions (tooltips) to each Quick Tool button in ChatHome, so users understand what each tool does before clicking.
+
+- When the user hovers over a quick-tool button (Resume Analysis, Job Match Analysis, Career Roadmap, Micro-Projects, Salary Negotiation, Career Match, Networking, Mock Interview), show a tooltip with a clear, one-to-two sentence description of what that tool does and what the user gets.
+- Use a tooltip component consistent with the app's existing UI (if there's a Tooltip primitive in the components/ui library, use it; otherwise add an accessible one).
+- Keep the tooltips concise and benefit-focused.
+
+Suggested descriptions (refine wording as needed):
+- Resume Analysis: "Get a detailed score and section-by-section breakdown of your resume, with specific improvements and gaps to fix."
+- Job Match Analysis: "Paste a job posting to see how well you match, plus a tailored resume and cover letter for that role."
+- Career Roadmap: "Get a structured 3-6 month plan to reach your target role, with milestones, skills, and resources."
+- Micro-Projects: "Get portfolio project ideas tailored to your goals, with datasets, tutorials, and starter code to build them."
+- Salary Negotiation: "Get a market-grounded negotiation strategy, leverage assessment, and a ready-to-use script or email."
+- Career Match: "Upload your resume and get a ranked list of careers that fit you, each with a score and detailed reasoning."
+- Networking: "Find niche networking opportunities for your field: local events, LinkedIn groups, and online communities."
+- Mock Interview: "Practice a video interview that asks questions aloud, then critiques both what you said and how you said it."
+
+Accessibility: make sure the tooltips are keyboard-accessible (show on focus, not just mouse hover) and work on touch devices in a reasonable way (e.g. the button still works on tap; the description can show on the welcome screen or a long-press).
+
+This is a UI addition only. Do not change tool behavior, conversation logic, or API calls.
