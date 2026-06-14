@@ -4178,13 +4178,35 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
     }
   });
 
-  app.post("/api/contact", async (req, res) => {
+  // Simple in-memory rate limiter for /api/contact (5 requests per hour per IP)
+  const contactRateMap = new Map<string, { count: number; resetAt: number }>();
+  app.post("/api/contact", async (req: AuthRequest, res) => {
     try {
+      // Honeypot check — silently succeed if filled
+      if (req.body.website) {
+        return res.json({ message: "Contact form submitted successfully" });
+      }
+
+      // Per-IP rate limiting
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";
+      const now = Date.now();
+      const entry = contactRateMap.get(ip);
+      if (entry && now < entry.resetAt) {
+        if (entry.count >= 5) {
+          return res.status(429).json({ error: "Too many requests. Please wait before submitting again." });
+        }
+        entry.count++;
+      } else {
+        contactRateMap.set(ip, { count: 1, resetAt: now + 60 * 60 * 1000 });
+      }
+
       const contactFormSchema = z.object({
-        name: z.string().min(2),
-        email: z.string().email(),
-        subject: z.string().min(5),
-        message: z.string().min(10),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        email: z.string().email("Please enter a valid email address"),
+        category: z.enum(["Support issue", "Feature suggestion", "Other"]),
+        message: z.string().min(10, "Message must be at least 10 characters"),
+        website: z.string().optional(),
       });
 
       const validationResult = contactFormSchema.safeParse(req.body);
@@ -4193,14 +4215,21 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
         return res.status(400).json({ error: validationError.message });
       }
 
-      const { name, email, subject, message } = validationResult.data;
+      const { firstName, lastName, email, category, message } = validationResult.data;
 
-      const success = await emailService.sendContactForm({
-        name,
-        email,
-        subject,
-        message,
-      });
+      // Attach user ID if an auth token is present (optional auth)
+      let userId: number | undefined;
+      try {
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith("Bearer ")) {
+          const token = authHeader.slice(7);
+          const jwt = await import("jsonwebtoken");
+          const decoded = jwt.default.verify(token, process.env.JWT_SECRET || "fallback-secret") as { userId: number };
+          userId = decoded.userId;
+        }
+      } catch { /* no auth token — that's fine */ }
+
+      const success = await emailService.sendContactForm({ firstName, lastName, email, category, message, userId });
 
       if (!success) {
         return res.status(500).json({ error: "Failed to send email. Please try again later." });

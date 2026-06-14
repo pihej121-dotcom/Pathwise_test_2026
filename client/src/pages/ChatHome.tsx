@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { SiLinkedin, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
 import MockInterviewPanel, { type InterviewQuestion, type SessionAnswer } from "@/components/MockInterviewPanel";
+import { ContactUsDialog } from "@/components/ContactUsDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Logo } from "@/components/Logo";
@@ -317,6 +318,7 @@ export default function ChatHome() {
   const [isTyping, setIsTyping] = useState(false);
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("sidebarCollapsed") === "true");
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -1776,6 +1778,15 @@ End with a candid, constructive closing note. If their expectations need adjusti
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setContactOpen(true)}
+              className="hidden sm:flex text-muted-foreground hover:text-foreground text-sm"
+              data-testid="button-contact-us-open"
+            >
+              Contact Us
+            </Button>
             <a
               href="https://donate.stripe.com/00wdR8ab1gSxbQygjLak001"
               target="_blank"
@@ -2450,6 +2461,12 @@ End with a candid, constructive closing note. If their expectations need adjusti
           )}
         </div>
       </div>
+
+      <ContactUsDialog
+        open={contactOpen}
+        onOpenChange={setContactOpen}
+        defaultValues={user ? { firstName: user.firstName, lastName: user.lastName, email: user.email } : undefined}
+      />
     </div>
   );
 }

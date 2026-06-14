@@ -23,10 +23,12 @@ export interface LicenseNotificationData {
 }
 
 export interface ContactFormData {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  subject: string;
+  category: string;
   message: string;
+  userId?: number;
 }
 
 export interface PasswordResetData {
@@ -230,15 +232,23 @@ Pathwise · https://pathwise.nyc`;
   async sendContactForm(data: ContactFormData): Promise<boolean> {
     try {
       const { client, fromEmail } = getResendClient();
+      const fullName = `${data.firstName} ${data.lastName}`;
+      const subject = `[${data.category}] New contact form submission from ${fullName}`;
+      const userLine = data.userId ? `<p><strong>User ID:</strong> ${data.userId}</p>` : "";
       await client.emails.send({
         from: fromEmail,
-        to: "patrick@pathwise.nyc",
+        to: "contact@pathwise.nyc",
         replyTo: data.email,
-        subject: `Contact Form: ${data.subject}`,
+        subject,
         html: `
-          <p><strong>From:</strong> ${data.name} (${data.email})</p>
-          <p><strong>Message:</strong><br>${data.message}</p>
+          <p><strong>Name:</strong> ${fullName}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Category:</strong> ${data.category}</p>
+          ${userLine}
+          <p><strong>Message:</strong></p>
+          <p style="white-space:pre-wrap;">${data.message}</p>
         `,
+        text: `Name: ${fullName}\nEmail: ${data.email}\nCategory: ${data.category}${data.userId ? `\nUser ID: ${data.userId}` : ""}\n\nMessage:\n${data.message}`,
       });
       return true;
     } catch (error) {
