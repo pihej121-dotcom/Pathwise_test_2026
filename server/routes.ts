@@ -4183,7 +4183,7 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
   app.post("/api/contact", async (req: AuthRequest, res) => {
     try {
       // Honeypot check — silently succeed if filled
-      if (req.body.website) {
+      if (req.body.honeypot || req.body.website) {
         return res.json({ message: "Contact form submitted successfully" });
       }
 
@@ -4200,22 +4200,44 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
         contactRateMap.set(ip, { count: 1, resetAt: now + 60 * 60 * 1000 });
       }
 
-      const contactFormSchema = z.object({
-        firstName: z.string().min(1, "First name is required"),
-        lastName: z.string().min(1, "Last name is required"),
-        email: z.string().email("Please enter a valid email address"),
-        category: z.enum(["Support issue", "Feature suggestion", "Other"]),
-        message: z.string().min(10, "Message must be at least 10 characters"),
-        website: z.string().optional(),
-      });
+      // Accept both new schema (firstName/lastName/category) and legacy Dashboard schema (name/subject)
+      const body = req.body;
+      let firstName: string, lastName: string, email: string, category: string, message: string;
 
-      const validationResult = contactFormSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        const validationError = fromZodError(validationResult.error);
-        return res.status(400).json({ error: validationError.message });
+      if (body.firstName !== undefined || body.lastName !== undefined) {
+        // New schema
+        const newSchema = z.object({
+          firstName: z.string().min(1, "First name is required"),
+          lastName: z.string().min(1, "Last name is required"),
+          email: z.string().email("Please enter a valid email address"),
+          category: z.enum(["Support issue", "Feature suggestion", "Other"]),
+          message: z.string().min(10, "Message must be at least 10 characters"),
+          honeypot: z.string().optional(),
+        });
+        const result = newSchema.safeParse(body);
+        if (!result.success) {
+          return res.status(400).json({ error: fromZodError(result.error).message });
+        }
+        ({ firstName, lastName, email, category, message } = result.data);
+      } else {
+        // Legacy Dashboard schema (name, email, subject, message)
+        const legacySchema = z.object({
+          name: z.string().min(2),
+          email: z.string().email(),
+          subject: z.string().min(5),
+          message: z.string().min(10),
+        });
+        const result = legacySchema.safeParse(body);
+        if (!result.success) {
+          return res.status(400).json({ error: fromZodError(result.error).message });
+        }
+        const parts = result.data.name.trim().split(" ");
+        firstName = parts[0];
+        lastName = parts.slice(1).join(" ") || "-";
+        email = result.data.email;
+        category = result.data.subject;
+        message = result.data.message;
       }
-
-      const { firstName, lastName, email, category, message } = validationResult.data;
 
       // Attach user ID if an auth token is present (optional auth)
       let userId: number | undefined;

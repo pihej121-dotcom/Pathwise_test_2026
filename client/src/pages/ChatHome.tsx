@@ -1782,10 +1782,11 @@ End with a candid, constructive closing note. If their expectations need adjusti
               variant="ghost"
               size="sm"
               onClick={() => setContactOpen(true)}
-              className="hidden sm:flex text-muted-foreground hover:text-foreground text-sm"
+              className="text-muted-foreground hover:text-foreground text-sm"
               data-testid="button-contact-us-open"
             >
-              Contact Us
+              <span className="hidden sm:inline">Contact Us</span>
+              <span className="sm:hidden text-xs">Help</span>
             </Button>
             <a
               href="https://donate.stripe.com/00wdR8ab1gSxbQygjLak001"
@@ -1820,8 +1821,15 @@ End with a candid, constructive closing note. If their expectations need adjusti
                   <div className="px-2 py-1.5">
                     <p className="text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                  </div>                
+                  </div>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setContactOpen(true)}
+                    className="sm:hidden"
+                  >
+                    Contact Us
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="sm:hidden" />
                   <DropdownMenuItem
                     onClick={() => { logout(); }}
                     className="text-destructive focus:text-destructive"

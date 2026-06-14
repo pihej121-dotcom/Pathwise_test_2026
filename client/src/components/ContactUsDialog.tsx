@@ -36,7 +36,7 @@ const contactSchema = z.object({
     required_error: "Please select a category",
   }),
   message: z.string().min(10, "Message must be at least 10 characters"),
-  website: z.string().optional(),
+  honeypot: z.string().optional(),
 });
 
 type ContactFormValues = z.infer<typeof contactSchema>;
@@ -149,7 +149,7 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   tabIndex={-1}
                   aria-hidden="true"
                   style={{ display: "none" }}
-                  {...form.register("website")}
+                  {...form.register("honeypot")}
                 />
 
                 <div className="grid grid-cols-2 gap-3">
