@@ -50,6 +50,7 @@ import {
   Video,
   Menu,
   Plus,
+  Search,
 } from "lucide-react";
 import { SiLinkedin, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
 import MockInterviewPanel, { type InterviewQuestion, type SessionAnswer } from "@/components/MockInterviewPanel";
@@ -310,6 +311,8 @@ export default function ChatHome() {
   const [isTyping, setIsTyping] = useState(false);
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("sidebarCollapsed") === "true");
+  const [sidebarSearch, setSidebarSearch] = useState("");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [currentSessionPrompt, setCurrentSessionPrompt] = useState<string>("");
   const [resumeScore, setResumeScore] = useState<number | null>(null);
@@ -1633,8 +1636,15 @@ End with a candid, constructive closing note. If their expectations need adjusti
           <div className="flex items-center gap-3">
             {user && (
               <button
-                onClick={() => setSidebarOpen((o) => !o)}
-                className="md:hidden p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                onClick={() => {
+                  setSidebarOpen((o) => !o);
+                  setSidebarCollapsed((c) => {
+                    const next = !c;
+                    localStorage.setItem("sidebarCollapsed", String(next));
+                    return next;
+                  });
+                }}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 aria-label="Toggle sidebar"
               >
                 <Menu className="w-5 h-5" />
@@ -1706,8 +1716,8 @@ End with a candid, constructive closing note. If their expectations need adjusti
                 onClick={() => setSidebarOpen(false)}
               />
             )}
-            <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-background border-r border-border/50 flex flex-col pt-14 transition-transform duration-200 ease-in-out md:relative md:inset-auto md:z-auto md:pt-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
-              <div className="p-3 border-b border-border/50 flex-shrink-0">
+            <aside className={`fixed inset-y-0 left-0 z-40 bg-background border-r border-border/50 flex flex-col pt-14 transition-all duration-200 ease-in-out md:relative md:inset-auto md:z-auto md:pt-0 w-64 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${sidebarCollapsed ? "md:w-0 md:min-w-0 md:overflow-hidden md:border-r-0" : "md:w-64"}`}>
+              <div className="p-3 border-b border-border/50 flex-shrink-0 flex flex-col gap-2 min-w-[16rem]">
                 <button
                   onClick={() => { resetChat(); setSidebarOpen(false); }}
                   data-testid="button-new-chat-sidebar"
@@ -1716,25 +1726,42 @@ End with a candid, constructive closing note. If their expectations need adjusti
                   <Plus className="w-4 h-4" />
                   New chat
                 </button>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    value={sidebarSearch}
+                    onChange={(e) => setSidebarSearch(e.target.value)}
+                    placeholder="Search conversations…"
+                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-border/60 bg-background placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-2">
-                {savedSessions.length > 0 ? (
-                  <div className="flex flex-col gap-0.5">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide px-2 pt-2 pb-1">Recent</p>
-                    {savedSessions.map((session) => (
-                      <button
-                        key={session.id}
-                        onClick={() => { resumeSession(session); setSidebarOpen(false); }}
-                        className={`w-full text-left px-2 py-2.5 rounded-lg transition-colors ${activeSessionId === session.id ? "bg-primary/10 font-medium" : "hover:bg-muted/60"}`}
-                      >
-                        <p className="text-xs text-foreground/90 truncate leading-snug">{session.prompt}</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {new Date(session.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
+              <div className="flex-1 overflow-y-auto p-2 min-w-[16rem]">
+                {savedSessions.length > 0 ? (() => {
+                  const filtered = savedSessions.filter((s) =>
+                    sidebarSearch === "" || s.prompt.toLowerCase().includes(sidebarSearch.toLowerCase())
+                  );
+                  return filtered.length > 0 ? (
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide px-2 pt-2 pb-1">Recent</p>
+                      {filtered.map((session) => (
+                        <button
+                          key={session.id}
+                          onClick={() => { resumeSession(session); setSidebarOpen(false); }}
+                          className={`w-full text-left px-2 py-2.5 rounded-lg transition-colors ${activeSessionId === session.id ? "bg-primary/10 font-medium" : "hover:bg-muted/60"}`}
+                        >
+                          <p className="text-xs text-foreground/90 truncate leading-snug">{session.prompt}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {new Date(session.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-6 px-3">No conversations found</p>
+                  );
+                })() : (
                   <p className="text-xs text-muted-foreground text-center py-6 px-3">No conversations yet — start one above!</p>
                 )}
               </div>
@@ -1853,45 +1880,25 @@ End with a candid, constructive closing note. If their expectations need adjusti
                 <p className="text-xs text-muted-foreground mb-2.5 font-medium uppercase tracking-wide">Quick tools</p>
                 <div className="flex flex-wrap gap-2.5">
                   {[
-                    { label: "Resume Analysis", prompt: "Analyze my resume and give me detailed feedback", icon: FileText },
-                    { label: "Job Match Analysis", prompt: "Help me find jobs that match my skills and experience — I want a job match score and tailored resume", icon: Briefcase },
-                    { label: "Career Roadmap", prompt: "Help me build a career roadmap for my goals", icon: Route },
-                    { label: "Micro-Projects", prompt: "Suggest portfolio projects I can build to strengthen my resume", icon: Zap },
-                    { label: "Salary Negotiation", prompt: "Help me negotiate my salary — I want to understand my leverage and get a negotiation strategy", icon: DollarSign },
-                  ].map(({ label, prompt, icon: Icon }) => (
+                    { label: "Resume Analysis", icon: FileText, onClick: () => handleInitialMessage("Analyze my resume and give me detailed feedback"), cls: "border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/20 hover:border-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300" },
+                    { label: "Job Match Analysis", icon: Briefcase, onClick: () => handleInitialMessage("Help me find jobs that match my skills and experience — I want a job match score and tailored resume"), cls: "border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-950/20 hover:border-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-700 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300" },
+                    { label: "Career Roadmap", icon: Route, onClick: () => handleInitialMessage("Help me build a career roadmap for my goals"), cls: "border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/20 hover:border-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300" },
+                    { label: "Micro-Projects", icon: Zap, onClick: () => handleInitialMessage("Suggest portfolio projects I can build to strengthen my resume"), cls: "border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 hover:border-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300" },
+                    { label: "Salary Negotiation", icon: DollarSign, onClick: () => handleInitialMessage("Help me negotiate my salary — I want to understand my leverage and get a negotiation strategy"), cls: "border-green-200 dark:border-green-800/60 bg-green-50 dark:bg-green-950/20 hover:border-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300" },
+                    { label: "Career Match", icon: Target, onClick: () => handleInitialMessage("Match careers to my resume based on my background"), cls: "border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300", testId: "button-career-match-quick-tool" },
+                    { label: "Networking", icon: Users, onClick: handleNetworkingClick, cls: "border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-950/20 hover:border-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300", testId: "button-networking-quick-tool" },
+                    { label: "Mock Interview", icon: Video, onClick: handleMockInterviewClick, cls: "border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300", testId: "button-mock-interview-quick-tool" },
+                  ].map(({ label, icon: Icon, onClick, cls, testId }: { label: string; icon: React.FC<{ className?: string }>; onClick: () => void; cls: string; testId?: string }) => (
                     <button
                       key={label}
-                      onClick={() => handleInitialMessage(prompt)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 text-sm text-muted-foreground hover:text-foreground transition-all"
+                      onClick={onClick}
+                      data-testid={testId}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-all ${cls}`}
                     >
                       <Icon className="w-4 h-4" />
                       {label}
                     </button>
                   ))}
-                  <button
-                    onClick={() => handleInitialMessage("Match careers to my resume based on my background")}
-                    data-testid="button-career-match-quick-tool"
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-sm text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-all"
-                  >
-                    <Target className="w-4 h-4" />
-                    Career Match
-                  </button>
-                  <button
-                    onClick={handleNetworkingClick}
-                    data-testid="button-networking-quick-tool"
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-950/20 hover:border-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-sm text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 transition-all"
-                  >
-                    <Users className="w-4 h-4" />
-                    Networking
-                  </button>
-                  <button
-                    onClick={handleMockInterviewClick}
-                    data-testid="button-mock-interview-quick-tool"
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-sm text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-all"
-                  >
-                    <Video className="w-4 h-4" />
-                    Mock Interview
-                  </button>
                 </div>
               </div>
             )}
@@ -2121,10 +2128,10 @@ End with a candid, constructive closing note. If their expectations need adjusti
                           Want to explore more tools?
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
-                            <Route className="w-3.5 h-3.5 mr-1.5" />
+                          <button onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/20 hover:border-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300">
+                            <Route className="w-3.5 h-3.5" />
                             Career Roadmap
-                          </Button>
+                          </button>
                         </div>
                       </>
                     ) : (
@@ -2136,14 +2143,14 @@ End with a candid, constructive closing note. If their expectations need adjusti
                           Continue with full AI-powered tools to get scored analysis, career plans, and practice.
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          <Button size="sm" onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")}>
-                            <FileText className="w-3.5 h-3.5 mr-1.5" />
+                          <button onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/20 hover:border-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
+                            <FileText className="w-3.5 h-3.5" />
                             Resume Analysis
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")}>
-                            <Route className="w-3.5 h-3.5 mr-1.5" />
+                          </button>
+                          <button onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/20 hover:border-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300">
+                            <Route className="w-3.5 h-3.5" />
                             Career Roadmap
-                          </Button>
+                          </button>
                         </div>
                       </>
                     )}
