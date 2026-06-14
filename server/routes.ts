@@ -274,6 +274,9 @@ if (existingUser && !existingUser.isActive) {
       if (invitation) {
         const token = generateToken();
         await storage.createSession(user.id, token, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        if (userRole === "student") {
+          void emailService.sendWelcomeEmail({ email: user.email, firstName });
+        }
         return res.status(201).json({
           message: "Registration successful! You can now log in.",
           user: { ...user, password: undefined },
@@ -301,6 +304,7 @@ if (existingUser && !existingUser.isActive) {
         token: verificationToken,
         institutionName: institutionDisplayName,
       });
+      void emailService.sendWelcomeEmail({ email: user.email, firstName });
       return res.status(201).json({
         message: "Account created! Please check your email to verify your address.",
         requiresVerification: true,

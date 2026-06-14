@@ -45,6 +45,11 @@ export interface AdminWelcomeData {
   licenseEndDate: string;
 }
 
+export interface WelcomeEmailData {
+  email: string;
+  firstName: string;
+}
+
 /* ✅ 1. Clean, Railway-friendly Resend client setup */
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -369,6 +374,164 @@ Pathwise · https://pathwise.nyc`;
       return true;
     } catch (error) {
       console.error("❌ Failed to send password reset email:", error);
+      return false;
+    }
+  }
+
+  async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
+    try {
+      const { client, fromEmail } = getResendClient();
+      const logoUrl = "https://pathwise.nyc/pathwise-logo.png";
+      const donateUrl = "https://donate.stripe.com/00wdR8ab1gSxbQygjLak001";
+
+      const features = [
+        { name: "Resume Analysis", desc: "Get a detailed score and a section-by-section breakdown of your resume, with specific improvements, gaps to fix, and recommended resources." },
+        { name: "Job Match Analysis", desc: "Paste a job posting and see how well you match, complete with a match score, a tailored resume, and a custom cover letter for that specific role." },
+        { name: "Career Match", desc: "Upload your resume and receive a ranked list of careers that fit your background, each with a score and a thorough explanation of why it's a strong match." },
+        { name: "Career Roadmap", desc: "Get a structured 3–6 month plan to reach your target role, with milestones, skills to build, and curated resources along the way." },
+        { name: "Micro-Projects", desc: "Receive portfolio project ideas tailored to your goals, complete with datasets, tutorials, and starter code to help you build them." },
+        { name: "Mock Interview", desc: "Practice a realistic video interview that asks questions aloud, then critiques both what you said and how you said it (pacing, filler words, structure, and more)." },
+        { name: "Salary Negotiation", desc: "Get a market-grounded negotiation strategy, an honest assessment of your leverage, and a ready-to-use script or email." },
+        { name: "Networking", desc: "Discover niche networking opportunities for your field, including local events, LinkedIn groups, and online communities." },
+        { name: "Resume ↔ CV Converter", desc: "Convert your resume into a CV or condense a CV into a focused resume, and export it as a Word document." },
+      ];
+
+      const featureRows = features
+        .map(
+          (f) => `
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+              <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0f172a;">${f.name}</p>
+              <p style="margin:0;font-size:13px;color:#64748b;line-height:1.5;">${f.desc}</p>
+            </td>
+          </tr>`
+        )
+        .join("");
+
+      const featureText = features
+        .map((f) => `• ${f.name} — ${f.desc}`)
+        .join("\n\n");
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td align="center" style="background-color:#0f172a;padding:28px 40px;">
+              <img src="${logoUrl}" alt="Pathwise" width="48" height="48" style="display:block;border-radius:10px;" />
+              <p style="margin:10px 0 0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">Pathwise</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px 40px 32px;">
+              <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3;">Welcome to Pathwise NYC, ${data.firstName}!</h1>
+              <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+                Thank you for registering. We're genuinely glad you're here.
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+                Our mission is simple: to bring you one step closer to closing the gap between where you are now and the career of your dreams. Everything we build is aimed at making your job search and career development clearer, faster, and less overwhelming.
+              </p>
+
+              <p style="margin:0 0 16px;font-size:15px;font-weight:600;color:#0f172a;">Here's everything you can do with Pathwise:</p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                ${featureRows}
+              </table>
+
+              <!-- Divider -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr><td style="border-top:1px solid #e2e8f0;"></td></tr>
+              </table>
+
+              <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.6;">
+                We're committed to keeping Pathwise free and accessible. If you believe in what we're building and want to help us keep it that way, you can support us here:
+              </p>
+
+              <!-- Donate button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                <tr>
+                  <td align="center" style="border-radius:8px;background-color:#0f172a;">
+                    <a href="${donateUrl}"
+                       target="_blank"
+                       style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;background-color:#0f172a;letter-spacing:0.1px;">
+                      Support Pathwise
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-size:14px;color:#475569;line-height:1.6;">
+                Have a question, an issue, or an idea to make Pathwise better? Just email us at
+                <a href="mailto:contact@pathwise.nyc" style="color:#4f46e5;text-decoration:none;">contact@pathwise.nyc</a> — we read every message.
+              </p>
+
+              <p style="margin:20px 0 0;font-size:15px;color:#0f172a;font-weight:500;line-height:1.6;">
+                Welcome aboard, and here's to closing the gap.<br />
+                <span style="font-weight:400;color:#64748b;">The Pathwise NYC Team</span>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="background-color:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.6;">
+                This email was sent by Pathwise &middot; <a href="https://pathwise.nyc" style="color:#94a3b8;text-decoration:underline;">pathwise.nyc</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      const text = `Welcome to Pathwise NYC, ${data.firstName}!
+
+Thank you for registering for Pathwise NYC. We're genuinely glad you're here.
+
+Our mission is simple: to bring you one step closer to closing the gap between where you are now and the career of your dreams. Everything we build is aimed at making your job search and career development clearer, faster, and less overwhelming.
+
+Here's everything you can do with Pathwise:
+
+${featureText}
+
+We're committed to keeping Pathwise free and accessible. If you believe in what we're building and want to help us keep it that way, you can support us here:
+${donateUrl}
+
+Every contribution, big or small, helps us keep these tools free for job seekers everywhere.
+
+Have a question, an issue, or an idea to make Pathwise better? Just email us at contact@pathwise.nyc — we read every message.
+
+Welcome aboard, and here's to closing the gap.
+
+The Pathwise NYC Team
+
+---
+Pathwise · https://pathwise.nyc`;
+
+      await client.emails.send({
+        from: fromEmail,
+        to: data.email,
+        subject: "Welcome to Pathwise NYC — let's close the gap to your dream career",
+        html,
+        text,
+      });
+
+      console.log(`✅ Welcome email sent to ${data.email}`);
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to send welcome email:", error);
       return false;
     }
   }
