@@ -388,12 +388,12 @@ Pathwise · https://pathwise.nyc`;
         { name: "Resume Analysis", desc: "Get a detailed score and a section-by-section breakdown of your resume, with specific improvements, gaps to fix, and recommended resources." },
         { name: "Job Match Analysis", desc: "Paste a job posting and see how well you match, complete with a match score, a tailored resume, and a custom cover letter for that specific role." },
         { name: "Career Match", desc: "Upload your resume and receive a ranked list of careers that fit your background, each with a score and a thorough explanation of why it's a strong match." },
-        { name: "Career Roadmap", desc: "Get a structured 3–6 month plan to reach your target role, with milestones, skills to build, and curated resources along the way." },
+        { name: "Career Roadmap", desc: "Get a structured 3-6 month plan to reach your target role, with milestones, skills to build, and curated resources along the way." },
         { name: "Micro-Projects", desc: "Receive portfolio project ideas tailored to your goals, complete with datasets, tutorials, and starter code to help you build them." },
         { name: "Mock Interview", desc: "Practice a realistic video interview that asks questions aloud, then critiques both what you said and how you said it (pacing, filler words, structure, and more)." },
         { name: "Salary Negotiation", desc: "Get a market-grounded negotiation strategy, an honest assessment of your leverage, and a ready-to-use script or email." },
         { name: "Networking", desc: "Discover niche networking opportunities for your field, including local events, LinkedIn groups, and online communities." },
-        { name: "Resume ↔ CV Converter", desc: "Convert your resume into a CV or condense a CV into a focused resume, and export it as a Word document." },
+        { name: "Resume <-> CV Converter", desc: "Convert your resume into a CV or condense a CV into a focused resume, and export it as a Word document." },
       ];
 
       const featureRows = features
@@ -432,9 +432,9 @@ Pathwise · https://pathwise.nyc`;
           <!-- Body -->
           <tr>
             <td style="padding:36px 40px 32px;">
-              <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3;">Welcome to Pathwise NYC, ${data.firstName}!</h1>
+              <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${data.firstName},</p>
               <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
-                Thank you for registering. We're genuinely glad you're here.
+                Thank you for registering for Pathwise NYC. We're genuinely glad you're here.
               </p>
               <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
                 Our mission is simple: to bring you one step closer to closing the gap between where you are now and the career of your dreams. Everything we build is aimed at making your job search and career development clearer, faster, and less overwhelming.
@@ -456,7 +456,7 @@ Pathwise · https://pathwise.nyc`;
               </p>
 
               <!-- Donate button -->
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
                 <tr>
                   <td align="center" style="border-radius:8px;background-color:#0f172a;">
                     <a href="${donateUrl}"
@@ -467,6 +467,10 @@ Pathwise · https://pathwise.nyc`;
                   </td>
                 </tr>
               </table>
+
+              <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+                Every contribution, big or small, helps us keep these tools free for job seekers everywhere.
+              </p>
 
               <p style="margin:0;font-size:14px;color:#475569;line-height:1.6;">
                 Have a question, an issue, or an idea to make Pathwise better? Just email us at
@@ -496,7 +500,7 @@ Pathwise · https://pathwise.nyc`;
 </body>
 </html>`;
 
-      const text = `Welcome to Pathwise NYC, ${data.firstName}!
+      const text = `Hi ${data.firstName},
 
 Thank you for registering for Pathwise NYC. We're genuinely glad you're here.
 
