@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,14 +21,39 @@ import {
   Menu,
   Moon,
   Sun,
-  Heart
+  Heart,
+  KeyRound,
 } from "lucide-react";
 
 export function DropdownNav() {
   const [, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!user?.email) return;
+    setMenuOpen(false);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      if (!res.ok) throw new Error();
+      toast({
+        title: "Check your email",
+        description: "We've sent a link to reset your password.",
+      });
+    } catch {
+      toast({
+        title: "Something went wrong",
+        description: "Couldn't send the reset email. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getInitials = (firstName?: string, lastName?: string) => {
     return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
@@ -104,13 +130,20 @@ export function DropdownNav() {
                 <DropdownMenuSeparator />
 
                 {user ? (
-                  <DropdownMenuItem
-                    onClick={logout}
-                    className="text-red-500"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Log out
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={handleChangePassword} data-testid="button-change-password">
+                      <KeyRound className="w-4 h-4 mr-2" />
+                      Change password
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={logout}
+                      className="text-red-500"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Log out
+                    </DropdownMenuItem>
+                  </>
                 ) : (
                   <>
                     <DropdownMenuItem
