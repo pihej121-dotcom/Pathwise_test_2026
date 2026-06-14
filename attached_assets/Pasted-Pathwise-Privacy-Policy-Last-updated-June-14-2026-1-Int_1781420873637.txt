@@ -1,0 +1,79 @@
+Pathwise Privacy Policy
+Last updated: June 14, 2026
+1. Introduction
+This Privacy Policy explains how Pathwise NYC ("Pathwise," "we," "us," or "our") collects, uses, shares, and protects your personal information when you use the Pathwise website and services at pathwise.nyc (the "Service"). It applies to all users, including those in the United States and internationally.
+By using the Service, you agree to the practices described here. If you do not agree, please do not use the Service.
+2. Information We Collect
+Information you provide directly:
+
+Account information: your first and last name, email address, and password (stored in encrypted/hashed form). If you sign in through a third party such as Google, we receive basic profile information from that provider.
+Career documents and inputs: resumes, CVs, and any text, answers, or details you submit when using our tools (for example, target roles, background information, job postings, and salary details).
+Mock interview recordings: if you use the Mock Interview feature, audio and video you record, and the transcripts generated from them.
+Communications: information you submit through our contact form, including your name, email, and message.
+
+Information collected automatically:
+
+Essential/authentication cookies and local storage: we use cookies and browser local storage only as necessary to operate the Service, such as keeping you logged in and saving your session and preferences. We do not use advertising or third-party analytics tracking cookies.
+Limited technical data: basic information your browser sends automatically (such as IP address) as needed to deliver and secure the Service.
+
+3. How We Use Your Information
+We use your information solely to provide and operate the Service, including to:
+
+Create and manage your account and authenticate you.
+Generate the AI-assisted outputs you request (resume analysis, career matches, networking recommendations, interview critiques, document conversion, and similar features).
+Send transactional emails such as password resets and email verification.
+Respond to your contact-form messages and support requests.
+Maintain the security, integrity, and proper functioning of the Service.
+
+We do not sell your personal information. We do not use your personal information for advertising, and we do not use your User Content to train our own AI models.
+4. How We Share Your Information
+We share information only with third-party service providers ("processors") that help us operate the Service, and only to the extent necessary to provide it. These include:
+
+AI processing providers (e.g., OpenAI) to generate resume analysis, career suggestions, interview transcription and critique, and other AI outputs. Your relevant inputs (such as resume text or recordings) are transmitted to these providers to produce the results you request.
+Email delivery providers (e.g., Resend) to send transactional and contact-related emails.
+Search providers (e.g., our self-hosted search service) to surface networking events and communities.
+Hosting and infrastructure providers to run the Service and store data.
+
+These providers are permitted to use your information only to perform services for us. We may also disclose information if required by law, to comply with legal process, or to protect the rights, safety, or property of Pathwise, our users, or others.
+5. Legal Bases for Processing (EU/EEA/UK Users)
+If you are in the European Economic Area or the United Kingdom, we process your personal data on the following legal bases:
+
+Performance of a contract: to provide the Service you request.
+Consent: where you have given it (for example, by submitting a resume or recording for analysis). You may withdraw consent at any time.
+Legitimate interests: to secure and improve the operation of the Service, where those interests are not overridden by your rights.
+Legal obligation: where processing is required to comply with applicable law.
+
+6. Data Retention
+We currently retain your account information and User Content for as long as we operate the Service, including after account deletion, unless you request deletion of your data (see "Your Rights" below).
+You may request deletion of your personal data at any time by contacting us at contact@pathwise.nyc, and we will delete it except where we are required to retain it by law.
+(Note: we may update this section to adopt defined retention periods.)
+7. Your Privacy Rights
+Depending on where you live, you may have some or all of the following rights regarding your personal information:
+
+Access: request a copy of the personal data we hold about you.
+Correction: request that we correct inaccurate or incomplete data.
+Deletion: request that we delete your personal data.
+Portability: request your data in a portable format.
+Restriction/Objection: request that we limit or stop certain processing.
+Withdraw consent: withdraw consent where processing is based on it.
+
+EU/EEA/UK users have these rights under the GDPR and may also lodge a complaint with their local data protection authority.
+California residents have rights under the CCPA/CPRA, including the right to know, delete, and correct personal information, and the right not to be discriminated against for exercising those rights. We do not sell or "share" personal information as those terms are defined under California law.
+To exercise any right, contact us at contact@pathwise.nyc. We will respond within the timeframe required by applicable law and may need to verify your identity first.
+8. International Data Transfers
+Pathwise is operated from the United States, and our service providers may process data in the United States and other countries. If you access the Service from outside the United States, you understand that your information will be transferred to, stored, and processed in the United States, where data protection laws may differ from those in your country. Where required, we rely on appropriate safeguards (such as standard contractual clauses) for international transfers.
+9. Data Security
+We use reasonable technical and organizational measures to protect your personal information, including encryption of passwords and secure transmission. However, no method of transmission or storage is completely secure, and we cannot guarantee absolute security.
+10. Cookies and Local Storage
+We use only essential cookies and browser local storage needed to operate the Service, such as keeping you signed in and storing your session and conversation history locally in your browser. We do not use advertising or third-party tracking cookies. You can control cookies through your browser settings, but disabling essential cookies may prevent the Service from working properly.
+11. Children's Privacy
+The Service is not intended for individuals under 16 years of age (or the applicable age of digital consent in your jurisdiction). We do not knowingly collect personal information from children under that age. If you believe a child has provided us personal information, contact us and we will delete it.
+12. Third-Party Links
+The Service may link to third-party websites, events, groups, and communities that we do not control. This Privacy Policy does not apply to those third parties, and we are not responsible for their privacy practices. We encourage you to review their policies.
+13. Changes to This Privacy Policy
+We may update this Privacy Policy from time to time. If we make material changes, we will update the "Last updated" date and, where appropriate, provide additional notice. Your continued use of the Service after changes take effect constitutes acceptance.
+14. Contact Us
+If you have questions or requests regarding this Privacy Policy or your personal information, contact us at:
+Pathwise NYC
+
+Email: contact@pathwise.nyc

@@ -1,0 +1,72 @@
+Pathwise Terms of Service
+Last updated: June 14, 2026
+1. Agreement to Terms
+These Terms of Service ("Terms") are a binding agreement between you and Pathwise NYC ("Pathwise," "we," "us," or "our"), governing your access to and use of the Pathwise website, applications, and services (collectively, the "Service"), available at pathwise.nyc and related domains.
+By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.
+2. Eligibility
+You must be at least 16 years old (or the age of digital consent in your jurisdiction, if higher) to use the Service. By using the Service, you represent that you meet this requirement and that you have the legal capacity to enter into these Terms.
+3. Description of the Service
+Pathwise provides career-development tools, including AI-assisted resume analysis, job-match analysis, career matching, networking recommendations, mock interview practice, document conversion, and related features. The Service is provided free of charge.
+We may modify, suspend, or discontinue any part of the Service at any time without notice.
+4. AI-Generated Content and No Professional Advice
+This section is important. Please read it carefully.
+The Service uses artificial intelligence to generate content, including but not limited to resume scores, career suggestions, salary-negotiation guidance, interview critiques, and skill assessments ("AI Output").
+You acknowledge and agree that:
+
+AI Output is generated automatically and may be inaccurate, incomplete, outdated, or otherwise unreliable.
+AI Output does not constitute professional career counseling, legal advice, financial advice, or any other form of professional advice.
+Salary, negotiation, and compensation-related information is provided for general informational purposes only and is not a guarantee of any outcome. You are solely responsible for any decisions you make based on it.
+Recommendations, links, events, and communities surfaced by the Service are provided "as is," may be third-party content we do not control, and may be inaccurate or no longer available.
+You should independently verify any information before relying on it and consult a qualified professional where appropriate.
+
+We make no representations or warranties about the accuracy or usefulness of any AI Output, and we are not responsible for decisions you make based on it.
+5. User Accounts
+To access certain features, you may create an account. You agree to:
+
+Provide accurate and complete information.
+Keep your login credentials secure and confidential.
+Be responsible for all activity that occurs under your account.
+Notify us promptly of any unauthorized use.
+
+You may register using an email and password or through third-party sign-in (e.g., Google). We are not responsible for the practices of third-party authentication providers.
+6. User Content
+"User Content" means anything you upload, submit, or input, including resumes, CVs, messages, recordings, and other materials.
+You retain ownership of your User Content. By submitting it, you grant us a limited, non-exclusive, worldwide, royalty-free license to use, store, process, and transmit it solely for the purpose of operating and providing the Service to you (including processing it through the third-party services described in Section 7).
+You represent that you have the right to submit your User Content and that it does not violate any law or third-party right. You are solely responsible for your User Content.
+7. Third-Party Services
+The Service relies on third-party providers to function, including but not limited to AI processing, email delivery, search, and hosting providers. To provide the Service, your User Content (including resume text and other inputs) may be transmitted to and processed by these third parties.
+We are not responsible for the availability, accuracy, content, or practices of third-party services, websites, or resources that the Service links to or relies upon. Your use of third-party services may be subject to their own terms and privacy policies.
+8. Acceptable Use
+You agree not to:
+
+Use the Service for any unlawful, fraudulent, or harmful purpose.
+Upload content that is illegal, infringing, defamatory, or that contains another person's private information without authorization.
+Attempt to gain unauthorized access to the Service, other accounts, or our systems.
+Reverse-engineer, scrape, or misuse the Service or its underlying systems.
+Interfere with or disrupt the Service, including by transmitting malware or overloading our infrastructure.
+Use the Service to develop a competing product.
+
+We may suspend or terminate access for violations.
+9. Intellectual Property
+The Service, including its software, design, text, and branding (excluding your User Content), is owned by Pathwise NYC and protected by intellectual-property laws. We grant you a limited, non-exclusive, non-transferable, revocable license to use the Service for its intended purpose. No other rights are granted.
+10. Privacy
+Your use of the Service is also governed by our Privacy Policy [LINK], which explains how we collect, use, and share your information. By using the Service, you consent to those practices.
+11. Disclaimer of Warranties
+THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, AND NON-INFRINGEMENT.
+WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, ERROR-FREE, OR THAT ANY OUTPUT WILL BE ACCURATE OR RELIABLE.
+12. Limitation of Liability
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, PATHWISE NYC AND ITS OFFICERS, EMPLOYEES, AND AGENTS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF DATA, OPPORTUNITIES, OR PROFITS, ARISING FROM YOUR USE OF (OR INABILITY TO USE) THE SERVICE.
+BECAUSE THE SERVICE IS PROVIDED FREE OF CHARGE, OUR TOTAL AGGREGATE LIABILITY FOR ANY CLAIM ARISING FROM THESE TERMS OR THE SERVICE WILL NOT EXCEED ONE HUNDRED U.S. DOLLARS ($100).
+Some jurisdictions do not allow certain limitations, so some of the above may not apply to you.
+13. Indemnification
+You agree to indemnify and hold harmless Pathwise NYC from any claims, damages, or expenses (including reasonable legal fees) arising from your User Content, your use of the Service, or your violation of these Terms.
+14. Termination
+You may stop using the Service and delete your account at any time. We may suspend or terminate your access at any time, with or without cause. Upon termination, the provisions that by their nature should survive (including Sections 4, 6, 9, 11, 12, and 13) will survive.
+15. International Users
+The Service is operated from the United States. If you access it from outside the U.S., you do so on your own initiative and are responsible for compliance with local laws. We make no representation that the Service is appropriate or available in all locations.
+16. Changes to These Terms
+We may update these Terms from time to time. If we make material changes, we will update the "Last updated" date and, where appropriate, provide additional notice. Your continued use of the Service after changes take effect constitutes acceptance.
+17. Governing Law and Dispute Resolution
+These Terms are governed by the laws of the State of New York, without regard to its conflict-of-laws principles. Any dispute will be resolved in the state or federal courts located in New York County, New York, and you consent to their jurisdiction.
+18. Contact
+Questions about these Terms? Contact us at contact@pathwise.nyc.

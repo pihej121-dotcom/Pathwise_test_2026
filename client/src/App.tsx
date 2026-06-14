@@ -29,6 +29,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
 import InstitutionAdminDashboard from "@/pages/InstitutionAdminDashboard";
 import TermsOfService from "@/pages/TermsOfService";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import VerifyEmail from "@/pages/VerifyEmail";
 import NotFound from "@/pages/not-found";
 
@@ -124,6 +125,7 @@ function Router() {
       <Route path="/checkout" component={Checkout} />
       <Route path="/checkout/success" component={CheckoutSuccess} />
       <Route path="/terms" component={TermsOfService} />
+      <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/chat" component={ChatHome} />
       

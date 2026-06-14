@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -19,17 +20,24 @@ export default function Register() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Extract invitation token from URL
   const urlParams = new URLSearchParams(window.location.search);
   const invitationToken =
     urlParams.get("invitationToken") || urlParams.get("token");
 
+  const canSubmit = !!firstName && !!email && !!password && agreedToTerms;
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName || !email || !password) return;
+    if (!canSubmit) return;
+
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms of Service and Privacy Policy to create an account.");
+      return;
+    }
 
     try {
       setError("");
@@ -74,7 +82,6 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-accent/10 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        {/* Back Button */}
         <Link href="/">
           <Button variant="ghost" className="mb-4">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -128,6 +135,7 @@ export default function Register() {
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
+                    data-testid="input-first-name"
                   />
                 </div>
                 <div className="space-y-2 flex-1">
@@ -138,6 +146,7 @@ export default function Register() {
                     placeholder="Doe"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
+                    data-testid="input-last-name"
                   />
                 </div>
               </div>
@@ -151,6 +160,7 @@ export default function Register() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  data-testid="input-email"
                 />
               </div>
 
@@ -164,13 +174,47 @@ export default function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
+                  data-testid="input-password"
                 />
+              </div>
+
+              <div className="flex items-start gap-3 pt-1">
+                <Checkbox
+                  id="terms"
+                  checked={agreedToTerms}
+                  onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                  data-testid="checkbox-terms"
+                  className="mt-0.5"
+                />
+                <label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                  I agree to the{" "}
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline underline-offset-2 hover:opacity-80"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Terms of Service
+                  </a>
+                  {" "}and{" "}
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline underline-offset-2 hover:opacity-80"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Privacy Policy
+                  </a>
+                </label>
               </div>
 
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isSubmitting || !firstName || !email || !password}
+                disabled={isSubmitting || !canSubmit}
+                data-testid="button-create-account"
               >
                 {isSubmitting ? "Creating account…" : "Create account"}
               </Button>
@@ -190,4 +234,3 @@ export default function Register() {
     </div>
   );
 }
-
