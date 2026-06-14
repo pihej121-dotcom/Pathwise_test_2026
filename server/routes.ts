@@ -4237,6 +4237,139 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
     }
   });
 
+  // Resume <-> CV Converter (public — no auth required)
+  app.post("/api/ai/convert-resume-cv", async (req, res) => {
+    try {
+      const { text, direction } = req.body;
+
+      if (!text || typeof text !== "string" || text.trim().length < 30) {
+        return res.status(400).json({ error: "Please provide document text (at least 30 characters)." });
+      }
+      if (direction !== "resume-to-cv" && direction !== "cv-to-resume") {
+        return res.status(400).json({ error: "Direction must be 'resume-to-cv' or 'cv-to-resume'." });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const isResumeToCv = direction === "resume-to-cv";
+
+      const systemPrompt = isResumeToCv
+        ? `You are an expert academic CV writer. Your job is to reformat a resume into a proper academic CV structure.
+
+CRITICAL HONESTY RULES — DO NOT BREAK THESE:
+1. Do NOT invent, fabricate, or assume ANY information not in the source document.
+2. Do NOT add publications, grants, research, awards, presentations, or patents unless they appear in the source.
+3. For sections where you have no source data, add a clear placeholder like: [Add your publications here] or [Add your teaching experience here].
+4. Do NOT expand on or embellish any experience, dates, titles, or accomplishments beyond what is stated.
+5. If the source is a simple resume with no academic content, restructure what exists into CV format and clearly label the placeholder sections.
+
+CV FORMAT STRUCTURE (use ALL sections — mark empty ones with placeholders):
+CURRICULUM VITAE
+[Full Name from source]
+[Contact info from source]
+
+SUMMARY / RESEARCH INTERESTS
+[Reformat from resume summary or objective. If none: Add your research interests or professional summary here.]
+
+EDUCATION
+[All education from source, reverse chronological. Include degree, institution, year, GPA if listed.]
+
+ACADEMIC / PROFESSIONAL EXPERIENCE
+[All experience from source in CV style — full dates, institution name, title, bullet-point responsibilities.]
+
+RESEARCH EXPERIENCE
+[Only if source mentions research. Otherwise: Add any research experience, thesis, dissertation, or lab work here.]
+
+PUBLICATIONS
+[PLACEHOLDER: Add your peer-reviewed publications here. Format: Author(s). (Year). Title. Journal, Volume(Issue), pages.]
+
+PRESENTATIONS & CONFERENCES
+[PLACEHOLDER: Add your conference presentations or invited talks here.]
+
+TEACHING EXPERIENCE
+[Only if source mentions teaching. Otherwise: Add any teaching, tutoring, or instructional experience here.]
+
+AWARDS & HONORS
+[Only if source mentions awards. Otherwise: Add scholarships, fellowships, grants, or academic honors here.]
+
+SKILLS
+[All skills from source — technical skills, languages, tools, certifications.]
+
+PROFESSIONAL MEMBERSHIPS
+[PLACEHOLDER: Add professional associations or memberships here.]
+
+REFERENCES
+[PLACEHOLDER: Available upon request. Add 3 references with name, title, institution, email, phone.]
+
+FORMAT RULES:
+- Plain text with section headers in ALL CAPS
+- CV has no page limit — include all detail from the source
+- Start your response directly with the CV content, no preamble`
+        : `You are an expert resume writer. Your job is to condense a CV into a focused 1–2 page resume.
+
+CRITICAL HONESTY RULES — DO NOT BREAK THESE:
+1. Do NOT invent, fabricate, or add ANY information not in the source CV.
+2. Do NOT add skills, accomplishments, or experiences not in the source.
+3. Only remove or condense — never expand beyond what is in the source.
+
+RESUME FORMAT (1–2 pages, prioritize recent and most relevant):
+
+[Full Name]
+[Contact info — email, phone, location, LinkedIn if present]
+
+PROFESSIONAL SUMMARY
+[2–3 sentence summary from the CV's most impressive and relevant points. Only use what is in the CV.]
+
+EXPERIENCE
+[Top 3–5 most recent/relevant positions. For each: Job Title | Company | Start – End date | 3–5 bullet points. Condense verbose CV descriptions into tight, action-verb-led bullets. Quantify impact where the CV already provides numbers — do not invent numbers.]
+
+EDUCATION
+[Highest degree first. Include degree, institution, year. Omit thesis details unless very brief.]
+
+SKILLS
+[Consolidated list of technical skills, tools, languages from the CV.]
+
+CERTIFICATIONS
+[Only if present in the source CV.]
+
+PUBLICATIONS (condensed)
+[If 1–3 publications, list them. If more than 3, note "X peer-reviewed publications — see full CV." Omit if none.]
+
+FORMAT RULES:
+- Plain text, section headers in ALL CAPS
+- Action verbs to start every bullet (Led, Built, Designed, Managed, etc.)
+- Start your response directly with the resume content, no preamble`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Source document to convert:\n\n${text.trim()}` },
+        ],
+        max_tokens: 4000,
+        temperature: 0.3,
+      });
+
+      const convertedText = completion.choices[0]?.message?.content || "";
+      if (!convertedText) {
+        return res.status(500).json({ error: "Conversion produced empty output." });
+      }
+
+      const paragraphs = parseResumeContentToDocx(convertedText);
+      const doc = new Document({ sections: [{ properties: {}, children: paragraphs }] });
+      const docxBuffer = await Packer.toBuffer(doc);
+
+      res.json({
+        convertedText,
+        docxBuffer: docxBuffer.toString("base64"),
+      });
+    } catch (error) {
+      console.error("CV converter error:", error);
+      res.status(500).json({ error: "Failed to convert document." });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

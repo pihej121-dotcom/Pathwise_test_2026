@@ -52,6 +52,7 @@ import {
   Menu,
   Plus,
   Search,
+  ArrowLeftRight,
 } from "lucide-react";
 import { SiLinkedin, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
 import MockInterviewPanel, { type InterviewQuestion, type SessionAnswer } from "@/components/MockInterviewPanel";
@@ -71,6 +72,8 @@ type ConversationState =
   | "generating"
   | "networking_intake"
   | "mock_interview_intake"
+  | "cv_converter_direction"
+  | "cv_converter_upload"
   | "complete";
 
 interface NetworkingIntake {
@@ -91,7 +94,7 @@ interface NetworkingParams {
   intakeResumeText?: string;
 }
 
-type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "career_match" | "mock_interview" | "general" | null;
+type GoalType = "competitiveness" | "job_match" | "readiness" | "roadmap" | "interview" | "projects" | "resume_score" | "salary_negotiation" | "career_match" | "mock_interview" | "cv_converter" | "general" | null;
 
 type UserProfile = {
   background: string; // raw answer to the background question
@@ -209,6 +212,7 @@ function detectGoal(message: string): GoalType {
   const lower = message.toLowerCase();
   if (lower.match(/salary|negotiat|raise|promotion|pay|compensation|offer.*negot|counter.?offer|increment|wage|pay.?raise|pay.?increase/)) return "salary_negotiation";
   if (lower.match(/career match|what careers fit|careers for me|career suggestions|best career.*me|careers based on|suggest.*careers|what should i do with my|careers.*resume|match.*career/)) return "career_match";
+  if (lower.match(/resume.*cv|cv.*resume|resume to cv|cv to resume|convert.*cv|convert.*resume|curriculum vitae/)) return "cv_converter";
   if (lower.match(/job match|match.*job|match.*position|match.*role|fit.*job|qualify.*job|how.*competitive|stack up|apply to|job posting|hiring/)) return "job_match";
   if (lower.match(/competi|qualify|fit for/)) return "competitiveness";
   if (lower.match(/readiness|ready|career readiness|assess|prepared/)) return "readiness";
@@ -318,6 +322,7 @@ export default function ChatHome() {
   const [currentSessionPrompt, setCurrentSessionPrompt] = useState<string>("");
   const [resumeScore, setResumeScore] = useState<number | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [cvDocxBuffer, setCvDocxBuffer] = useState<string>("");
 
   // Load saved sessions when user is available
   useEffect(() => {
@@ -359,6 +364,17 @@ export default function ChatHome() {
   const handleInitialMessage = async (text: string) => {
     addMessage("user", text);
     const goal = detectGoal(text);
+
+    // CV Converter: skip background questions, go straight to direction selection
+    if (goal === "cv_converter") {
+      setData((prev) => ({ ...prev, userMessage: text, goal, answers: {} }));
+      setState("cv_converter_direction");
+      setCurrentSessionPrompt(text);
+      await simulateAssistantReply(
+        "I can convert between a resume and a CV.\n\nWhich direction would you like?\n\n**A) Resume → CV** — Expand your resume into a comprehensive academic CV format (with placeholder sections for anything that can't be derived from your resume)\n**B) CV → Resume** — Condense your CV into a focused 1–2 page targeted resume\n\nJust reply **A** or **B**."
+      );
+      return;
+    }
 
     // Career Match: skip background questions, go straight to resume upload
     if (goal === "career_match") {
@@ -639,6 +655,70 @@ export default function ChatHome() {
       await simulateAssistantReply(
         `Sorry, I couldn't generate your critique. ${err.message || "Please try again."}`
       );
+      setState("complete");
+    }
+  };
+
+  const handleCvConverterDirection = async (text: string) => {
+    const lower = text.toLowerCase().trim();
+    let direction: "resume-to-cv" | "cv-to-resume" | null = null;
+    if (lower === "a" || lower === "a)" || lower.includes("resume") && lower.includes("cv") && !lower.startsWith("cv")) {
+      direction = "resume-to-cv";
+    } else if (lower === "b" || lower === "b)" || lower.startsWith("cv") || lower === "cv to resume") {
+      direction = "cv-to-resume";
+    }
+    if (!direction) {
+      await simulateAssistantReply("Please reply **A** (Resume → CV) or **B** (CV → Resume).");
+      return;
+    }
+    setData((prev) => ({ ...prev, answers: { ...prev.answers, cv_direction: direction! } }));
+    setState("cv_converter_upload");
+    const prompt = direction === "resume-to-cv"
+      ? "**Resume → CV** selected.\n\nI'll restructure your resume into a comprehensive CV format — keeping only what you've provided and clearly marking sections you'll need to fill in yourself.\n\nPlease share your resume — upload a file (PDF, DOCX, TXT) using the paperclip button, or paste the text directly below."
+      : "**CV → Resume** selected.\n\nI'll condense your CV into a focused 1–2 page resume, prioritizing your most relevant and recent experience.\n\nPlease share your CV — upload a file (PDF, DOCX, TXT) using the paperclip button, or paste the text directly below.";
+    await simulateAssistantReply(prompt);
+  };
+
+  const runCvConverter = async (documentText: string) => {
+    const direction = data.answers.cv_direction as "resume-to-cv" | "cv-to-resume";
+    setState("generating");
+    await simulateAssistantReply(
+      direction === "resume-to-cv"
+        ? "Converting your resume into CV format… ✨"
+        : "Condensing your CV into a targeted resume… ✨",
+      600
+    );
+    setIsTyping(true);
+    try {
+      const authToken = localStorage.getItem("auth_token");
+      const response = await fetch("/api/ai/convert-resume-cv", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ text: documentText, direction }),
+      });
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.error || "Conversion failed");
+      }
+      const result = await response.json();
+      setCvDocxBuffer(result.docxBuffer || "");
+      setIsTyping(false);
+      addMessage("assistant", result.convertedText);
+      setState("complete");
+      if (user) {
+        const finalMessages = [
+          ...messages,
+          { id: Date.now().toString(), role: "assistant" as const, content: result.convertedText, timestamp: new Date() },
+        ];
+        const updated = saveSession(user.id, currentSessionPrompt, finalMessages);
+        setSavedSessions(updated);
+      }
+    } catch (err: any) {
+      setIsTyping(false);
+      await simulateAssistantReply(`Sorry, the conversion failed. ${err.message || "Please try again."}`);
       setState("complete");
     }
   };
@@ -1483,6 +1563,16 @@ End with a candid, constructive closing note. If their expectations need adjusti
     } else if (state === "mock_interview_intake") {
       addMessage("user", text);
       await handleMockInterviewIntakeAnswer(text);
+    } else if (state === "cv_converter_direction") {
+      addMessage("user", text);
+      await handleCvConverterDirection(text);
+    } else if (state === "cv_converter_upload") {
+      addMessage("user", text);
+      if (!text.trim()) {
+        await simulateAssistantReply("Please paste your document text or use the upload button to share a file.");
+        return;
+      }
+      await runCvConverter(text);
     }
   };
 
@@ -1543,6 +1633,11 @@ End with a candid, constructive closing note. If their expectations need adjusti
       return;
     }
 
+    if (data.goal === "cv_converter") {
+      await runCvConverter(resumeText);
+      return;
+    }
+
     if (data.goal === "career_match") {
       await generateCareerMatch({ ...data, resumeText });
       return;
@@ -1589,10 +1684,26 @@ End with a candid, constructive closing note. If their expectations need adjusti
     setInputValue("");
     setCurrentSessionPrompt("");
     setActiveSessionId(null);
+    setCvDocxBuffer("");
   };
 
   const downloadTextFile = (content: string, filename: string) => {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadDocxFile = (base64Buffer: string, filename: string) => {
+    const binaryStr = atob(base64Buffer);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1608,11 +1719,13 @@ End with a candid, constructive closing note. If their expectations need adjusti
     networkingIntakeRef.current != null &&
     networkingIntakeRef.current.steps[networkingIntakeRef.current.stepIndex] === "resume";
 
-  const showFileUpload = state === "resume_upload" || networkingOnResumeStep;
+  const showFileUpload = state === "resume_upload" || networkingOnResumeStep || state === "cv_converter_upload";
 
   const getInputPlaceholder = () => {
     if (state === "idle") return "Tell me what you need help with…";
     if (state === "resume_upload") return "Paste your resume text, or type \"skip\"…";
+    if (state === "cv_converter_direction") return "Type A or B…";
+    if (state === "cv_converter_upload") return "Paste your document text here, or upload a file using the paperclip button…";
     if (networkingOnResumeStep) return "Paste your resume text, or type \"skip\"…";
     if (state === "mock_interview_intake") {
       return mockInterviewIntakeRef.current?.step === 0
@@ -1882,6 +1995,7 @@ End with a candid, constructive closing note. If their expectations need adjusti
                       { label: "Career Match", icon: Target, onClick: () => handleInitialMessage("Match careers to my resume based on my background"), cls: "border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300", testId: "button-career-match-quick-tool", tooltip: "Upload your resume and get a ranked list of careers that fit you, each with a score and detailed reasoning." },
                       { label: "Networking", icon: Users, onClick: handleNetworkingClick, cls: "border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-950/20 hover:border-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300", testId: "button-networking-quick-tool", tooltip: "Find niche networking opportunities for your field: local events, LinkedIn groups, and online communities." },
                       { label: "Mock Interview", icon: Video, onClick: handleMockInterviewClick, cls: "border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300", testId: "button-mock-interview-quick-tool", tooltip: "Practice a video interview that asks questions aloud, then critiques both what you said and how you said it." },
+                      { label: "Resume ↔ CV", icon: ArrowLeftRight, onClick: () => handleInitialMessage("Convert my resume to a CV"), cls: "border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/20 hover:border-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300", testId: "button-cv-converter-quick-tool", tooltip: "Convert your resume to a full academic CV, or condense a CV into a focused resume — then download as a Word file." },
                     ].map(({ label, icon: Icon, onClick, cls, testId, tooltip }: { label: string; icon: React.FC<{ className?: string }>; onClick: () => void; cls: string; testId?: string; tooltip: string }) => (
                       <Tooltip key={label}>
                         <TooltipTrigger asChild>
@@ -2027,7 +2141,35 @@ End with a candid, constructive closing note. If their expectations need adjusti
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
-                    {data.tailoredResume && data.tailoredCoverLetter ? (
+                    {data.goal === "cv_converter" && cvDocxBuffer ? (
+                      <>
+                        <p className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          Your converted document is ready
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                          Download your Word file below. Create a free account to save your work and access all tools.
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <Button
+                            size="sm"
+                            onClick={() => downloadDocxFile(cvDocxBuffer, data.answers.cv_direction === "resume-to-cv" ? "Curriculum_Vitae.docx" : "Resume.docx")}
+                            className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Word (.docx)
+                          </Button>
+                        </div>
+                        <div className="flex gap-2">
+                          <Link href="/register">
+                            <Button size="sm" variant="outline">
+                              Create free account
+                              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </>
+                    ) : data.tailoredResume && data.tailoredCoverLetter ? (
                       <>
                         <p className="font-semibold text-sm text-foreground flex items-center gap-1.5">
                           <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -2097,7 +2239,38 @@ End with a candid, constructive closing note. If their expectations need adjusti
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
-                    {data.tailoredResume && data.tailoredCoverLetter ? (
+                    {data.goal === "cv_converter" && cvDocxBuffer ? (
+                      <>
+                        <p className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          Your converted document is ready to download
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                          Your Word file is ready — download it and open in Microsoft Word or Google Docs.
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <Button
+                            size="sm"
+                            onClick={() => downloadDocxFile(cvDocxBuffer, data.answers.cv_direction === "resume-to-cv" ? "Curriculum_Vitae.docx" : "Resume.docx")}
+                            className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Word (.docx)
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">Want to explore more tools?</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => handleInitialMessage("Analyze my resume and give me detailed feedback")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/20 hover:border-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
+                            <FileText className="w-3.5 h-3.5" />
+                            Resume Analysis
+                          </button>
+                          <button onClick={() => handleInitialMessage("Help me build a career roadmap for my goals")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/20 hover:border-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300">
+                            <Route className="w-3.5 h-3.5" />
+                            Career Roadmap
+                          </button>
+                        </div>
+                      </>
+                    ) : data.tailoredResume && data.tailoredCoverLetter ? (
                       <>
                         <p className="font-semibold text-sm text-foreground flex items-center gap-1.5">
                           <CheckCircle2 className="w-4 h-4 text-green-500" />
