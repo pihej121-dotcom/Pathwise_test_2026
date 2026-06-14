@@ -1,0 +1,26 @@
+Add a new tool to ChatHome called "Resume <-> CV Converter" that converts between a resume and a CV using GPT and exports the result as a .docx file.
+
+What it does:
+- The user uploads or pastes a document and chooses a direction:
+  A) Resume -> CV: expand and reformat a short resume into a longer, more comprehensive CV structure.
+  B) CV -> Resume: condense a long CV into a focused, 1-2 page targeted resume.
+- After conversion, the user can download the result as a .docx (Word) file.
+
+Intake flow (consistent with the other ChatHome tools):
+1. Add it as a quick-tool button and a detectable goal (trigger phrases like "convert my resume to a CV", "turn my CV into a resume", "resume to CV").
+2. Ask which direction they want (Resume -> CV or CV -> Resume).
+3. Collect the source document (file upload or paste), reusing the existing resume collection/extraction logic (extractTextFromFile handles PDF/DOCX/TXT).
+4. Send to GPT (existing /api/ai/career-analysis or a dedicated endpoint) to perform the conversion.
+
+IMPORTANT honesty constraint:
+- GPT must NOT invent content that isn't in the source. For Resume -> CV specifically, it cannot fabricate publications, research, awards, or detailed history that a real academic CV has. It should reformat and reorganize the existing content into proper CV structure, and clearly list the sections the user would need to fill in themselves (e.g. "Publications — add your papers here"). Do not hallucinate credentials or experience.
+- For CV -> Resume, prioritize and condense the most relevant content; do not add anything not in the source.
+
+.docx export:
+- Generate a real Word .docx file (not plain text). Use a library such as the "docx" npm package to build the document with proper headings and sections. Provide a Download button, like the existing tailored-resume/cover-letter download buttons but producing .docx instead of .txt.
+
+Consistency:
+- Session state only, no database persistence. Save the conversation to localStorage via saveSession for logged-in users.
+- Format any on-screen output using the same markdown conventions the other tools use.
+
+Before building, tell me: which library you'll use for .docx generation, and whether .docx generation happens client-side or via a backend endpoint. Then proceed.
