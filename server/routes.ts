@@ -261,6 +261,7 @@ if (existingUser && !existingUser.isActive) {
           allow_promotion_codes: true, // Enable promo code field in Stripe checkout
         });
 
+        void emailService.sendWelcomeEmail({ email: user.email, firstName });
         return res.status(201).json({
           message: "Registration successful! Redirecting to payment...",
           user: { ...user, password: undefined },
