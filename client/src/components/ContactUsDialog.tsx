@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -66,6 +66,19 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
       honeypot: "",
     },
   });
+
+  useEffect(() => {
+    if (open && !submitted) {
+      form.reset({
+        firstName: defaultValues?.firstName ?? "",
+        lastName: defaultValues?.lastName ?? "",
+        email: defaultValues?.email ?? "",
+        category: undefined,
+        message: form.getValues("message"),
+        honeypot: "",
+      });
+    }
+  }, [open, defaultValues?.firstName, defaultValues?.lastName, defaultValues?.email]);
 
   const onSubmit = async (values: ContactFormValues) => {
     setSubmitError(null);
