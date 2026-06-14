@@ -1,0 +1,35 @@
+Build a "Contact Us" form that sends submissions to contact@pathwise.nyc via Resend (reuse the existing Resend setup already used for auth emails).
+
+Make the Contact Us form accessible from ChatHome for BOTH logged-out (before registration) and logged-in (after registration) users. It must not require authentication to view or submit. Add a clear, visible way to open it in both states (e.g. a "Contact Us" link/button in the header or footer that's present for guests and signed-in users alike). Open it in a way that doesn't disrupt the chat (e.g. a modal/dialog or a dedicated section), consistent with the app's existing UI.
+
+Intro text to display above the form:
+"Need help or have an idea? Whether you're running into a support issue or have a suggestion to make your resume and career journey easier, we'd love to hear it. Fill out the form below and we'll get back to you as soon as we can."
+
+Form fields:
+- First name (required)
+- Last name (required)
+- Email (required, validate proper email format — this is how we reply)
+- Category (required dropdown): "Support issue", "Feature suggestion", "Other"
+- Message (required, textarea)
+- Submit button
+
+Do NOT include a password field. A contact form must never collect passwords.
+
+If the user IS logged in, pre-fill first name, last name, and email from their account to save them typing (but still let them edit). If logged out, leave the fields blank.
+
+Backend:
+- Add an endpoint POST /api/contact that sends the submission via Resend to contact@pathwise.nyc.
+- This endpoint must NOT require authentication (guests use it too).
+- FROM the verified Resend sender (use EMAIL_FROM env var, e.g. support@pathwise.nyc); set replyTo to the user's submitted email so replies go to them.
+- Subject like "[Support issue] New contact form submission from {First Last}".
+- Body includes name, email, category, message. If submitted by a logged-in user, optionally note their account/user id in the body for context.
+- Validate inputs server-side (required fields present, valid email). Reject malformed submissions with a clear error.
+
+Frontend:
+- Success confirmation after submit ("Thanks! We'll get back to you soon.") and clear the form.
+- Clear error message if the send fails, without losing what the user typed.
+- Spam protection: a honeypot field (hidden; if filled, silently drop). Since this endpoint is public/unauthenticated, also add basic rate limiting per IP to prevent abuse.
+
+Note for me: contact@pathwise.nyc must exist (alias or mailbox) to receive these, and pathwise.nyc must be verified in Resend for the FROM address. Flag this.
+
+Keep it consistent with the app's existing UI components and styling.
