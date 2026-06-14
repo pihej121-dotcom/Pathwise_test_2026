@@ -63,14 +63,14 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
       email: defaultValues?.email ?? "",
       category: undefined,
       message: "",
-      website: "",
+      honeypot: "",
     },
   });
 
   const onSubmit = async (values: ContactFormValues) => {
     setSubmitError(null);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -102,7 +102,7 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
           email: defaultValues?.email ?? "",
           category: undefined,
           message: "",
-          website: "",
+          honeypot: "",
         });
       }, 300);
     }

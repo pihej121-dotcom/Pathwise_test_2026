@@ -4239,15 +4239,13 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
         message = result.data.message;
       }
 
-      // Attach user ID if an auth token is present (optional auth)
+      // Attach user ID if an auth token is present (optional auth — same lookup as authenticate middleware)
       let userId: number | undefined;
       try {
-        const authHeader = req.headers.authorization;
-        if (authHeader?.startsWith("Bearer ")) {
-          const token = authHeader.slice(7);
-          const jwt = await import("jsonwebtoken");
-          const decoded = jwt.default.verify(token, process.env.JWT_SECRET || "fallback-secret") as { userId: number };
-          userId = decoded.userId;
+        const token = req.headers.authorization?.replace("Bearer ", "") || req.cookies?.auth_token;
+        if (token) {
+          const session = await storage.getSession(token);
+          if (session) userId = session.userId;
         }
       } catch { /* no auth token — that's fine */ }
 
