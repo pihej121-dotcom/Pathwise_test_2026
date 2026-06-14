@@ -53,6 +53,7 @@ import {
   Plus,
   Search,
   ArrowLeftRight,
+  Heart,
 } from "lucide-react";
 import { SiLinkedin, SiReddit, SiSlack, SiDiscord } from "react-icons/si";
 import MockInterviewPanel, { type InterviewQuestion, type SessionAnswer } from "@/components/MockInterviewPanel";
@@ -1775,6 +1776,20 @@ End with a candid, constructive closing note. If their expectations need adjusti
             )}
           </div>
           <div className="flex items-center gap-2">
+            <a
+              href="https://donate.stripe.com/00wdR8ab1gSxbQygjLak001"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="link-donate-now"
+            >
+              <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-1.5 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800/60 dark:hover:bg-rose-950/20">
+                <Heart className="w-3.5 h-3.5" />
+                Donate
+              </Button>
+              <Button variant="outline" size="sm" className="sm:hidden p-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800/60 dark:hover:bg-rose-950/20">
+                <Heart className="w-3.5 h-3.5" />
+              </Button>
+            </a>
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
