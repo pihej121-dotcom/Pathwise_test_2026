@@ -1,0 +1,18 @@
+Two updates to the Mock Interview feature.
+
+1. Extend the number of questions.
+- Increase the number of interview questions per session. Target around 8 to 10 questions (up from the current count). Make the count a single easily-adjustable constant/config value so it's trivial to change later.
+- Make sure the rest of the flow (asking each aloud via OpenAI TTS, recording, transcription, critique) still works correctly across the larger number of questions, including the progress indicator.
+
+2. Incorporate the user's resume into the questions.
+- Collect the user's resume during the intake conversation, the same way the other tools do (file upload or paste, reusing the existing extractTextFromFile logic for PDF/DOCX/TXT). Ask for it as part of the Mock Interview intake, before generating questions.
+- Make the resume optional but encouraged: if provided, generate questions personalized to the user's actual background; if the user skips, fall back to the current role/category-based questions.
+- When a resume is provided, pass it (along with the existing role/category inputs) to the question-generation step so the AI creates questions that reference the user's real experience, projects, skills, and gaps, like an interviewer who has read their resume. Include a mix of: resume-specific questions (e.g. about a specific role or project on the resume), role/behavioral questions, and at least one question probing a gap or weak area evident from the resume.
+
+Keep everything else the same:
+- Still reuse the existing question-generation logic/service (don't rebuild it; extend its inputs to accept resume context).
+- OpenAI TTS for asking questions aloud, with browser-voice fallback.
+- Recording, Whisper transcription, and content + delivery critique unchanged (the critique can also take the resume into account when judging answer relevance, if straightforward).
+- Session state only, no database persistence.
+
+Confirm the new question count and how you'll pass the resume into question generation, then build.

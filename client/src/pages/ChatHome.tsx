@@ -339,8 +339,9 @@ export default function ChatHome() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const networkingIntakeRef = useRef<NetworkingIntake | null>(null);
   const networkingParamsRef = useRef<NetworkingParams>({});
-  const mockInterviewIntakeRef = useRef<{ step: number; role?: string } | null>(null);
+  const mockInterviewIntakeRef = useRef<{ step: number; role?: string; category?: string; resumeText?: string } | null>(null);
   const mockInterviewRoleRef = useRef<string>("");
+  const mockInterviewResumeRef = useRef<string>("");
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -573,7 +574,7 @@ export default function ChatHome() {
       await simulateAssistantReply(
         `Got it — **${text}** interview. What type of questions would you like?\n\n- **behavioral** — past experiences & teamwork\n- **technical** — role-specific skills & knowledge\n- **situational** — hypothetical problem-solving\n- **mix** — a blend of all three`
       );
-    } else {
+    } else if (intake.step === 1) {
       const raw = text.toLowerCase();
       const category =
         raw.includes("tech") ? "technical"
@@ -582,8 +583,18 @@ export default function ChatHome() {
         : raw.includes("mix") || raw.includes("all") || raw.includes("blend") ? "mix"
         : "behavioral";
 
+      intake.category = category;
+      intake.step = 2;
+      await simulateAssistantReply(
+        `Great — **${category}** questions for a **${intake.role}** role.\n\nTo personalize your questions, share your resume — upload a file (PDF, DOCX, TXT) using the 📎 button, or paste the text below.\n\nSkip this step by typing **skip** and I'll generate standard questions for the role.`
+      );
+    } else {
+      // Step 2: resume (optional)
+      const resumeText = text.toLowerCase().trim() === "skip" ? "" : text;
       const role = intake.role || "Professional";
+      const category = intake.category || "behavioral";
       mockInterviewRoleRef.current = role;
+      mockInterviewResumeRef.current = resumeText;
       mockInterviewIntakeRef.current = null;
 
       await simulateAssistantReply("Generating your interview questions…", 400);
@@ -597,7 +608,7 @@ export default function ChatHome() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           },
-          body: JSON.stringify({ role, category, count: 5 }),
+          body: JSON.stringify({ role, category, ...(resumeText ? { resumeText } : {}) }),
         });
         if (!res.ok) {
           const e = await res.json().catch(() => ({}));
@@ -610,7 +621,7 @@ export default function ChatHome() {
           {
             id: Date.now().toString(),
             role: "assistant",
-            content: `Here are your **5 ${category === "mix" ? "mixed" : category} interview questions** for a **${role}** role. Each question will be shown on screen and can be read aloud. Record your answer, then move to the next. Your full critique will appear when the session is complete.`,
+            content: `Here are your **${questions.length} ${category === "mix" ? "mixed" : category} interview questions** for a **${role}** role.${resumeText ? " These are personalized to your resume." : ""} Each question will be shown on screen and can be read aloud. Record your answer, then move to the next. Your full critique will appear when the session is complete.`,
             timestamp: new Date(),
             mockInterviewData: { questions, role },
           },
@@ -636,7 +647,7 @@ export default function ChatHome() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
         },
-        body: JSON.stringify({ role: mockInterviewRoleRef.current, answers }),
+        body: JSON.stringify({ role: mockInterviewRoleRef.current, answers, ...(mockInterviewResumeRef.current ? { resumeText: mockInterviewResumeRef.current } : {}) }),
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
@@ -1631,6 +1642,11 @@ End with a candid, constructive closing note. If their expectations need adjusti
       return;
     }
 
+    if (state === "mock_interview_intake" && mockInterviewIntakeRef.current?.step === 2) {
+      await handleMockInterviewIntakeAnswer(resumeText);
+      return;
+    }
+
     if (state === "networking_intake") {
       await handleNetworkingIntakeAnswer(resumeText);
       return;
@@ -1731,9 +1747,10 @@ End with a candid, constructive closing note. If their expectations need adjusti
     if (state === "cv_converter_upload") return "Paste your document text here, or upload a file using the paperclip button…";
     if (networkingOnResumeStep) return "Paste your resume text, or type \"skip\"…";
     if (state === "mock_interview_intake") {
-      return mockInterviewIntakeRef.current?.step === 0
-        ? "e.g. Software Engineer, Product Manager…"
-        : "behavioral / technical / situational / mix";
+      const step = mockInterviewIntakeRef.current?.step ?? 0;
+      if (step === 0) return "e.g. Software Engineer, Product Manager…";
+      if (step === 1) return "behavioral / technical / situational / mix";
+      return "Paste your resume text, or type \"skip\"…";
     }
     if (state === "job_details") return "Paste the job URL or qualifications/responsibilities…";
     if (state === "job_posting") return "Paste the full job posting text here (or a URL)…";

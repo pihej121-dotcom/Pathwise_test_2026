@@ -1238,9 +1238,13 @@ Provide JSON:
     }
   }
 
-  async generateInterviewQuestions(jobTitle: string, company: string, category: string, count: number = 10) {
+  async generateInterviewQuestions(jobTitle: string, company: string, category: string, count: number = 10, resumeText?: string) {
     try {
-      const prompt = `Generate ${count} ${category} interview questions for a ${jobTitle} position at ${company}.
+      const resumeSection = resumeText?.trim()
+        ? `\n\nThe candidate has provided their resume:\n<resume>\n${resumeText.trim()}\n</resume>\n\nPersonalize the questions to this specific resume. Include:\n- At least 2 questions that reference a specific role, project, or skill listed on the resume\n- At least 1 question that probes a gap or weak area evident from the resume (missing experience, short tenures, skill gaps for a ${jobTitle} role)\n- The remaining questions should be role/behavioral questions appropriate for a ${jobTitle} that a candidate with this background would face\nAn interviewer who has read this resume carefully is conducting the interview.`
+        : "";
+
+      const prompt = `Generate ${count} ${category} interview questions for a ${jobTitle} position at ${company}.${resumeSection}
 
 For each question, provide:
 1. The question itself

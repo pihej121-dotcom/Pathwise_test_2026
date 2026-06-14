@@ -2869,21 +2869,27 @@ Make your recommendations specific, actionable, and data-driven based on the act
 
   // ── Mock Interview ──────────────────────────────────────────────────────────
 
+  // Total questions per mock interview session — change this one number to adjust the count.
+  const MOCK_INTERVIEW_QUESTION_COUNT = 9;
+
   app.post("/api/mock-interview/generate-questions", authenticate, async (req: AuthRequest, res) => {
     try {
-      const { role, category = "behavioral", count = 5 } = req.body;
+      const { role, category = "behavioral", resumeText } = req.body;
       if (!role) return res.status(400).json({ error: "Role is required" });
+
+      const perType = Math.floor(MOCK_INTERVIEW_QUESTION_COUNT / 3);
+      const remainder = MOCK_INTERVIEW_QUESTION_COUNT - perType * 3;
 
       let questions: any[];
       if (category === "mix") {
         const [behavioral, technical, situational] = await Promise.all([
-          aiService.generateInterviewQuestions(role, "a leading company", "behavioral", 2),
-          aiService.generateInterviewQuestions(role, "a leading company", "technical", 2),
-          aiService.generateInterviewQuestions(role, "a leading company", "situational", 1),
+          aiService.generateInterviewQuestions(role, "a leading company", "behavioral", perType + remainder, resumeText),
+          aiService.generateInterviewQuestions(role, "a leading company", "technical", perType, resumeText),
+          aiService.generateInterviewQuestions(role, "a leading company", "situational", perType, resumeText),
         ]);
         questions = [...behavioral, ...technical, ...situational];
       } else {
-        questions = await aiService.generateInterviewQuestions(role, "a leading company", category, count);
+        questions = await aiService.generateInterviewQuestions(role, "a leading company", category, MOCK_INTERVIEW_QUESTION_COUNT, resumeText);
       }
       res.json(questions);
     } catch (err: any) {
@@ -2919,8 +2925,9 @@ Make your recommendations specific, actionable, and data-driven based on the act
 
   app.post("/api/mock-interview/critique", authenticate, async (req: AuthRequest, res) => {
     try {
-      const { role, answers } = req.body as {
+      const { role, answers, resumeText } = req.body as {
         role: string;
+        resumeText?: string;
         answers: Array<{
           question: string;
           transcript: string;
@@ -2971,7 +2978,11 @@ Filler words: ${a.totalFillers > 0 ? Object.entries(a.fillerCounts).map(([k, v])
 Long pauses (>2s): ${a.longPauses.length > 0 ? a.longPauses.map((p: number) => `${p}s`).join(", ") : "none"}
 Transcript: "${a.transcript || "(no speech detected)"}"`).join("\n\n");
 
-      const userPrompt = `The candidate is practicing for a **${role || "General"}** interview.
+      const resumeContext = resumeText?.trim()
+        ? `\n\nCandidate's resume (use it to assess whether answers match their stated background and call out any inconsistencies or missed opportunities to reference real experience):\n<resume>\n${resumeText.trim()}\n</resume>`
+        : "";
+
+      const userPrompt = `The candidate is practicing for a **${role || "General"}** interview.${resumeContext}
 
 ${answersSummary}
 
