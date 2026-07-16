@@ -3,17 +3,25 @@
  *
  * Wraps the Express app so it can run as a Vercel serverless function.
  * Static frontend assets are served by Vercel's CDN from dist/public.
+ *
+ * Middleware order matters:
+ * 1. express.raw() for /api/stripe/webhook  ← must be before express.json()
+ * 2. express.json() for all other routes
  */
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { registerRoutes } from "../server/routes";
 
 const app = express();
+
+// Stripe webhook needs raw body BEFORE express.json() parses it.
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: false, limit: "15mb" }));
 app.use(cookieParser());
 
-// Request logger (mirrors server/index.ts)
+// Request logger
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   const path = req.path;
@@ -48,11 +56,8 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
 });
 
-// Register all API routes once; cache the promise across warm invocations.
-// On Vercel, serverless instances are reused while warm, so this avoids
-// re-registering routes on every request.
+// Register all API routes once; reuse across warm invocations.
 let routesReady: Promise<void>;
-
 function ensureRoutes() {
   if (!routesReady) {
     routesReady = registerRoutes(app).then(() => {});

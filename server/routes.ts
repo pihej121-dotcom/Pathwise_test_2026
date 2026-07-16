@@ -1120,9 +1120,39 @@ if (existingUser && !existingUser.isActive) {
   // Resume routes
   app.post("/api/resumes/upload", authenticate, async (req: AuthRequest, res) => {
     try {
+      const userId = req.user!.id;
+      const { contentType, fileSizeBytes, originalFilename } = req.body;
+
+      // Validate content type if provided
+      const allowedTypes = [
+        "application/pdf",
+        "text/plain",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (contentType && !allowedTypes.includes(contentType)) {
+        return res.status(400).json({ error: "Only PDF, plain text (.txt), and DOCX files are allowed." });
+      }
+
+      // Validate file size (max 10 MB)
+      const MAX_BYTES = 10 * 1024 * 1024;
+      if (fileSizeBytes && fileSizeBytes > MAX_BYTES) {
+        return res.status(400).json({ error: "File must be 10 MB or smaller." });
+      }
+
       const objectStorage = new ObjectStorageService();
-      const uploadURL = await objectStorage.getObjectEntityUploadURL();
-      res.json({ uploadURL });
+      const { signedUrl, objectPath } = await objectStorage.getObjectEntityUploadURL(userId);
+
+      // Create a pending ownership record before returning the URL.
+      // This prevents abandoned uploads from creating orphaned objects without metadata.
+      await objectStorage.createPendingUploadRecord({
+        objectPath,
+        ownerUserId: userId,
+        originalFilename: originalFilename || "resume",
+        mimeType: contentType ?? null,
+        fileSizeBytes: fileSizeBytes ?? null,
+      });
+
+      res.json({ uploadURL: signedUrl, objectPath });
     } catch (error) {
       console.error("Resume upload URL error:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -3701,6 +3731,9 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
   });
 
   // Stripe webhook handler
+  // NOTE: This route receives a raw Buffer body (express.raw middleware is registered
+  // before express.json in server/index.ts and api/index.ts). Do NOT move it after
+  // express.json or Stripe signature verification will fail.
   app.post("/api/stripe/webhook", async (req, res) => {
     if (!stripe) {
       return res.status(500).json({ error: "Stripe is not configured" });
@@ -3715,9 +3748,20 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
     let event: Stripe.Event;
 
     try {
-      // In production, you should use a webhook secret
-      // For now, we'll parse the event directly
-      event = req.body;
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      const rawBody = req.body as Buffer;
+
+      if (webhookSecret) {
+        // Production path: verify the Stripe signature against the raw body.
+        // This prevents replay attacks and spoofed webhook events.
+        event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+      } else {
+        // Development fallback: no secret configured, parse JSON directly.
+        // STRIPE_WEBHOOK_SECRET must be set in production.
+        console.warn("⚠️  STRIPE_WEBHOOK_SECRET not set — skipping signature verification (dev only)");
+        const bodyStr = Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : JSON.stringify(rawBody);
+        event = JSON.parse(bodyStr) as Stripe.Event;
+      }
 
       // Handle the event
       switch (event.type) {

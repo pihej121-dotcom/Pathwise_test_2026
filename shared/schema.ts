@@ -1011,3 +1011,32 @@ export type ProjectCompletion = typeof projectCompletions.$inferSelect;
 export type InsertProjectCompletion = z.infer<typeof insertProjectCompletionSchema>;
 export type PortfolioArtifact = typeof portfolioArtifacts.$inferSelect;
 export type InsertPortfolioArtifact = z.infer<typeof insertPortfolioArtifactSchema>;
+
+// ---------------------------------------------------------------------------
+// File metadata — persistent ACL and ownership store for Supabase Storage.
+// Replaces the previous in-memory ACL map; safe for multi-instance deployments.
+// ---------------------------------------------------------------------------
+export const uploadStatusEnum = pgEnum("upload_status", ["pending", "completed", "failed"]);
+
+export const fileMetadata = pgTable("file_metadata", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  /** Supabase Storage object path, e.g. "uploads/{userId}/{uuid}" */
+  objectPath: text("object_path").notNull().unique(),
+  /** FK to users.id — the user who initiated the upload */
+  ownerUserId: varchar("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  visibility: text("visibility").$type<"public" | "private">().notNull().default("private"),
+  originalFilename: text("original_filename").notNull().default(""),
+  mimeType: text("mime_type"),
+  fileSizeBytes: integer("file_size_bytes"),
+  /** pending: URL issued but upload not confirmed; completed: upload verified; failed: abandoned */
+  uploadStatus: uploadStatusEnum("upload_status").notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertFileMetadataSchema = createInsertSchema(fileMetadata).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type FileMetadata = typeof fileMetadata.$inferSelect;
+export type InsertFileMetadata = z.infer<typeof insertFileMetadataSchema>;

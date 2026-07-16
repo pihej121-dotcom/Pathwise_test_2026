@@ -1,18 +1,19 @@
 /**
- * Object ACL — storage-agnostic access control types and helpers.
+ * Object ACL — PostgreSQL-backed access control for Supabase Storage objects.
  *
- * Policies are stored as plain JSON; the storage backend (Supabase Storage,
- * S3, GCS, etc.) is responsible for persisting them in object metadata or a
- * separate store.
+ * Ownership and visibility are stored in the `file_metadata` table so that
+ * all serverless instances share the same state (no in-memory maps).
  */
+import { db } from "./db";
+import { fileMetadata, insertFileMetadataSchema } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
-const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
-export { ACL_POLICY_METADATA_KEY };
+export const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
 
-// The type of the access group.
+// ── Types ──────────────────────────────────────────────────────────────────
+
 export enum ObjectAccessGroupType {}
 
-// The logical user group that can access the object.
 export interface ObjectAccessGroup {
   type: ObjectAccessGroupType;
   id: string;
@@ -28,12 +29,13 @@ export interface ObjectAclRule {
   permission: ObjectPermission;
 }
 
-// The ACL policy of the object.
 export interface ObjectAclPolicy {
   owner: string;
   visibility: "public" | "private";
   aclRules?: Array<ObjectAclRule>;
 }
+
+// ── Internal helpers ───────────────────────────────────────────────────────
 
 function isPermissionAllowed(
   requested: ObjectPermission,
@@ -53,19 +55,15 @@ abstract class BaseObjectAccessGroup implements ObjectAccessGroup {
   public abstract hasMember(userId: string): Promise<boolean>;
 }
 
-function createObjectAccessGroup(
-  group: ObjectAccessGroup,
-): BaseObjectAccessGroup {
+function createObjectAccessGroup(group: ObjectAccessGroup): BaseObjectAccessGroup {
   switch (group.type) {
     default:
       throw new Error(`Unknown access group type: ${group.type}`);
   }
 }
 
-/**
- * Checks if a user can access an object given a resolved ACL policy.
- * The caller is responsible for loading the policy from storage.
- */
+// ── Public policy helpers (accept a pre-loaded policy, no DB call) ─────────
+
 export async function canAccessObjectByPolicy({
   userId,
   aclPolicy,
@@ -85,7 +83,6 @@ export async function canAccessObjectByPolicy({
   }
 
   if (!userId) return false;
-
   if (aclPolicy.owner === userId) return true;
 
   for (const rule of aclPolicy.aclRules || []) {
@@ -101,27 +98,53 @@ export async function canAccessObjectByPolicy({
   return false;
 }
 
-// ---------------------------------------------------------------------------
-// Legacy shims — kept so existing callers don't break while being migrated.
-// These operate on a string objectPath rather than a GCS File object.
-// ---------------------------------------------------------------------------
+// ── DB-backed shims (keyed by object path) ─────────────────────────────────
 
-/** In-process ACL cache. Replace with a DB-backed store for multi-instance deployments. */
-const _aclStore = new Map<string, ObjectAclPolicy>();
-
+/**
+ * Upserts the ACL policy for an object path in the `file_metadata` table.
+ */
 export async function setObjectAclPolicy(
   objectPath: string,
   aclPolicy: ObjectAclPolicy,
 ): Promise<void> {
-  _aclStore.set(objectPath, aclPolicy);
+  await db
+    .insert(fileMetadata)
+    .values({
+      objectPath,
+      ownerUserId: aclPolicy.owner,
+      visibility: aclPolicy.visibility,
+      uploadStatus: "completed",
+    })
+    .onConflictDoUpdate({
+      target: fileMetadata.objectPath,
+      set: { visibility: aclPolicy.visibility },
+    });
 }
 
+/**
+ * Reads the ACL policy for an object path from the `file_metadata` table.
+ * Returns null if no record exists.
+ */
 export async function getObjectAclPolicy(
   objectPath: string,
 ): Promise<ObjectAclPolicy | null> {
-  return _aclStore.get(objectPath) ?? null;
+  const [row] = await db
+    .select()
+    .from(fileMetadata)
+    .where(eq(fileMetadata.objectPath, objectPath))
+    .limit(1);
+
+  if (!row) return null;
+
+  return {
+    owner: row.ownerUserId,
+    visibility: row.visibility,
+  };
 }
 
+/**
+ * Checks whether a user can access an object, loading the policy from the DB.
+ */
 export async function canAccessObject({
   userId,
   objectPath,

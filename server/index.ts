@@ -5,6 +5,11 @@ import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase, isDatabaseEmpty } from "./seed";
 
 const app = express();
+
+// ── Stripe webhook needs the raw request body BEFORE express.json() parses it.
+// Register the raw-body middleware only for the webhook path.
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: false, limit: "15mb" }));
 app.use(cookieParser());
@@ -54,8 +59,6 @@ app.use((req, res, next) => {
     // Continue server startup even if seeding fails
   }
 
-  // Removed opportunity radar feature
-
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -77,8 +80,6 @@ app.use((req, res, next) => {
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,

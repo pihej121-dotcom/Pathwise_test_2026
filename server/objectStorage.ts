@@ -3,10 +3,20 @@
  *
  * Replaces the previous Replit-proprietary GCS sidecar implementation.
  * Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.
+ *
+ * Security properties:
+ * - Only authenticated users may request a signed upload URL.
+ * - The server generates object paths that embed the owner's user ID.
+ * - Ownership is recorded in `file_metadata` before the upload URL is issued.
+ * - Downloads require an ownership check against `file_metadata`.
+ * - The SUPABASE_SERVICE_ROLE_KEY is never sent to the client.
  */
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import { Response } from "express";
+import { db } from "./db";
+import { fileMetadata } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -14,6 +24,8 @@ import {
   getObjectAclPolicy,
   setObjectAclPolicy,
 } from "./objectAcl";
+
+// ── Supabase client ────────────────────────────────────────────────────────
 
 function getSupabaseClient() {
   const url = process.env.SUPABASE_URL;
@@ -27,6 +39,12 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
+function getBucket(): string {
+  return process.env.SUPABASE_STORAGE_BUCKET || "resumes";
+}
+
+// ── Errors ─────────────────────────────────────────────────────────────────
+
 export class ObjectNotFoundError extends Error {
   constructor() {
     super("Object not found");
@@ -35,37 +53,100 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
-export class ObjectStorageService {
-  private getBucket(): string {
-    return process.env.SUPABASE_STORAGE_BUCKET || "resumes";
+export class ObjectForbiddenError extends Error {
+  constructor() {
+    super("Access denied");
+    this.name = "ObjectForbiddenError";
+    Object.setPrototypeOf(this, ObjectForbiddenError.prototype);
   }
+}
 
+// ── Service ────────────────────────────────────────────────────────────────
+
+export class ObjectStorageService {
   /**
-   * Returns a short-lived signed upload URL (PUT) that the client can use
-   * to upload a file directly to Supabase Storage without exposing credentials.
-   * TTL: 15 minutes.
+   * Generates a signed upload URL for direct client-side upload to Supabase Storage.
+   *
+   * The object path embeds the owner's userId to prevent cross-user path collisions.
+   * A `pending` DB record is created immediately; call `markUploadCompleted` after
+   * confirming the file arrived.
+   *
+   * @param userId  Authenticated user's ID (from the session).
+   * @returns       `{ signedUrl, objectPath }` — return both to the client so it can
+   *                send objectPath back when creating the resume record.
    */
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(userId: string): Promise<{ signedUrl: string; objectPath: string }> {
     const supabase = getSupabaseClient();
-    const objectName = `uploads/${randomUUID()}`;
+    const objectPath = `uploads/${userId}/${randomUUID()}`;
 
     const { data, error } = await supabase.storage
-      .from(this.getBucket())
-      .createSignedUploadUrl(objectName);
+      .from(getBucket())
+      .createSignedUploadUrl(objectPath);
 
     if (error) {
       throw new Error(`Failed to create signed upload URL: ${error.message}`);
     }
-    return data.signedUrl;
+
+    return { signedUrl: data.signedUrl, objectPath };
   }
 
   /**
-   * Generates a signed download URL for a private object (15-min TTL).
+   * Creates a `pending` ownership record in `file_metadata`.
+   * Must be called before the signed URL is returned to the client.
+   */
+  async createPendingUploadRecord(params: {
+    objectPath: string;
+    ownerUserId: string;
+    originalFilename: string;
+    mimeType?: string | null;
+    fileSizeBytes?: number | null;
+  }): Promise<void> {
+    await db
+      .insert(fileMetadata)
+      .values({
+        objectPath: params.objectPath,
+        ownerUserId: params.ownerUserId,
+        visibility: "private",
+        originalFilename: params.originalFilename,
+        mimeType: params.mimeType ?? null,
+        fileSizeBytes: params.fileSizeBytes ?? null,
+        uploadStatus: "pending",
+      })
+      .onConflictDoUpdate({
+        target: fileMetadata.objectPath,
+        set: { uploadStatus: "pending" },
+      });
+  }
+
+  /**
+   * Transitions a `pending` record to `completed` once the client confirms upload.
+   * Abandoned `pending` records do not imply a completed upload.
+   */
+  async markUploadCompleted(objectPath: string): Promise<void> {
+    await db
+      .update(fileMetadata)
+      .set({ uploadStatus: "completed" })
+      .where(eq(fileMetadata.objectPath, objectPath));
+  }
+
+  /**
+   * Marks a record as `failed` (e.g. client reported upload error).
+   */
+  async markUploadFailed(objectPath: string): Promise<void> {
+    await db
+      .update(fileMetadata)
+      .set({ uploadStatus: "failed" })
+      .where(eq(fileMetadata.objectPath, objectPath));
+  }
+
+  /**
+   * Generates a short-lived signed download URL (15-minute TTL).
+   * Does NOT enforce ACL — callers must check ownership first.
    */
   async getSignedDownloadURL(objectPath: string): Promise<string> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.storage
-      .from(this.getBucket())
+      .from(getBucket())
       .createSignedUrl(objectPath, 900);
 
     if (error) throw new Error(`Failed to sign download URL: ${error.message}`);
@@ -73,27 +154,42 @@ export class ObjectStorageService {
   }
 
   /**
-   * Streams a private object to the HTTP response.
-   * Checks the ACL policy (by object path) before serving.
+   * Downloads an object to the HTTP response.
+   * Checks ownership via `file_metadata` before serving.
+   * Pass `requestingUserId` to enforce private-object access control.
    */
   async downloadObject(
     objectPath: string,
     res: Response,
-    cacheTtlSec: number = 3600
+    requestingUserId?: string,
+    cacheTtlSec = 3600
   ): Promise<void> {
     try {
       const aclPolicy = await getObjectAclPolicy(objectPath);
+
+      const allowed = await canAccessObjectByPolicy({
+        userId: requestingUserId,
+        aclPolicy,
+        requestedPermission: ObjectPermission.READ,
+      });
+
+      if (!allowed) {
+        if (!res.headersSent) {
+          res.status(403).json({ error: "Access denied" });
+        }
+        return;
+      }
+
       const isPublic = aclPolicy?.visibility === "public";
 
       const supabase = getSupabaseClient();
       const { data, error } = await supabase.storage
-        .from(this.getBucket())
+        .from(getBucket())
         .download(objectPath);
 
       if (error) throw new ObjectNotFoundError();
 
-      const arrayBuffer = await data.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      const buffer = Buffer.from(await data.arrayBuffer());
 
       res.set({
         "Content-Type": data.type || "application/octet-stream",
@@ -106,6 +202,8 @@ export class ObjectStorageService {
       if (!res.headersSent) {
         if (error instanceof ObjectNotFoundError) {
           res.status(404).json({ error: "Object not found" });
+        } else if (error instanceof ObjectForbiddenError) {
+          res.status(403).json({ error: "Access denied" });
         } else {
           res.status(500).json({ error: "Error downloading file" });
         }
@@ -114,41 +212,14 @@ export class ObjectStorageService {
   }
 
   /**
-   * Normalizes a raw Supabase Storage URL to a short object path.
-   * e.g. "https://[project].supabase.co/storage/v1/object/sign/resumes/uploads/abc"
-   *   → "uploads/abc"
-   */
-  normalizeObjectEntityPath(rawPath: string): string {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    if (!supabaseUrl || !rawPath.startsWith(supabaseUrl)) {
-      return rawPath;
-    }
-    // Strip the storage URL prefix to get just the object name
-    const marker = `/object/`;
-    const idx = rawPath.indexOf(marker);
-    if (idx === -1) return rawPath;
-    const afterMarker = rawPath.slice(idx + marker.length);
-    // afterMarker is like: "sign/resumes/uploads/abc?token=..." or "public/resumes/uploads/abc"
-    // Remove query string then bucket prefix
-    const withoutQuery = afterMarker.split("?")[0];
-    const bucket = this.getBucket();
-    const bucketPrefix = `${withoutQuery.includes("/") ? withoutQuery.split("/")[0] : ""}/${bucket}/`;
-    if (withoutQuery.includes(`/${bucket}/`)) {
-      return withoutQuery.slice(withoutQuery.indexOf(`/${bucket}/`) + bucket.length + 2);
-    }
-    return withoutQuery;
-  }
-
-  /**
-   * Sets an ACL policy for an object entity (by normalized path).
+   * Sets an ACL policy for an object path (writes to `file_metadata`).
    */
   async trySetObjectEntityAclPolicy(
-    rawPath: string,
+    objectPath: string,
     aclPolicy: ObjectAclPolicy
   ): Promise<string> {
-    const normalizedPath = this.normalizeObjectEntityPath(rawPath);
-    await setObjectAclPolicy(normalizedPath, aclPolicy);
-    return normalizedPath;
+    await setObjectAclPolicy(objectPath, aclPolicy);
+    return objectPath;
   }
 
   /**
@@ -169,5 +240,13 @@ export class ObjectStorageService {
       aclPolicy,
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
+  }
+
+  /**
+   * Verifies that an objectPath legitimately belongs to a user.
+   * Path format: uploads/{userId}/{uuid}
+   */
+  static isOwnerPath(objectPath: string, userId: string): boolean {
+    return objectPath.startsWith(`uploads/${userId}/`);
   }
 }

@@ -1,0 +1,102 @@
+Before deploying, please correct and verify the following migration issues.
+
+1. Replace the in-memory object ACL map.
+
+The current in-process ACL map is not safe on Vercel because separate serverless instances do not share memory, and the data disappears when an instance is recycled.
+
+Create a PostgreSQL table for file metadata and authorization. It should store at least:
+
+* object path
+* owner user ID
+* visibility
+* original filename
+* MIME type
+* file size
+* upload status
+* created timestamp
+
+Use the existing users table and its actual user ID type. Update `server/objectAcl.ts` and `server/objectStorage.ts` to read and write ACL information through Drizzle/PostgreSQL. Do not store authorization information only in memory.
+
+Generate the corresponding Drizzle schema change or migration, but do not apply it to the Railway production database without showing me the migration first.
+
+2. Reduce the PostgreSQL pool size for Vercel.
+
+`max: 10` is per serverless instance and may create too many database connections. Set a conservative pool size, preferably 1 to 3, unless the application has a demonstrated need for more.
+
+Ensure the pool is created once at module scope and reused by warm function invocations. Confirm whether the current Drizzle and `pg` configuration uses named prepared statements that are incompatible with the Supabase transaction pooler.
+
+3. Correct the database migration instructions.
+
+Do not instruct me to run `db:push` and then import a full schema-and-data dump. That can create duplicate-table and duplicate-index errors.
+
+Provide two clearly separated options:
+
+Option A, preferred:
+
+* Start with an empty Supabase database.
+* Use `pg_dump --format=custom` from Railway.
+* Restore the complete schema and data with `pg_restore`.
+* Validate the restored schema against the Drizzle schema afterward.
+
+Option B:
+
+* Create the schema with Drizzle.
+* Export and import data only.
+* Correctly reset PostgreSQL sequences afterward.
+
+Include safe commands using environment variables rather than embedded passwords.
+
+4. Support both Supabase direct and session-pooler migration URLs.
+
+The direct Supabase hostname may require IPv6. Document that `DIRECT_URL` may use either:
+
+* the direct port 5432 connection, or
+* the session pooler on port 5432 when IPv6 is unavailable.
+
+5. Verify Supabase signed-upload security.
+
+Confirm that:
+
+* users must be authenticated before receiving a signed upload URL;
+* the server generates the object path;
+* object paths include the authenticated user ID;
+* path traversal and unsafe filenames are prevented;
+* MIME type and file size are validated;
+* ownership metadata is saved in PostgreSQL;
+* users cannot download or delete another user’s object;
+* abandoned or failed uploads do not leave misleading completed database records.
+
+The `SUPABASE_SERVICE_ROLE_KEY` must remain server-only.
+
+6. Verify the Vercel routing configuration.
+
+Show the complete `vercel.json`.
+
+Confirm that:
+
+* `/api/*` is routed to `api/index.ts`;
+* the API rewrite appears before the SPA fallback;
+* frontend routes fall back to `index.html`;
+* static assets are served directly;
+* the `functions` path exactly matches `api/index.ts`;
+* the configured 60-second duration is supported by the selected Vercel plan.
+
+7. Verify the Stripe webhook.
+
+Show the middleware registration order and confirm the Stripe webhook receives the raw request body before any general `express.json()` middleware processes it.
+
+8. Perform runtime tests, not only a Vite build.
+
+Run or provide tests for:
+
+* database connection through the Supabase transaction pooler;
+* one normal database read and write;
+* signed résumé upload;
+* authorized résumé download;
+* unauthorized download rejection;
+* email delivery through the direct Resend API;
+* Stripe webhook signature verification;
+* an API request through the Vercel-style entry point;
+* a frontend deep link that should return the SPA.
+
+Report every failure clearly. Do not migrate the production database, change DNS, or disable Railway yet.
