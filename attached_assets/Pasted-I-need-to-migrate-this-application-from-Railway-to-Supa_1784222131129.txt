@@ -1,0 +1,59 @@
+I need to migrate this application from Railway to Supabase and Vercel.
+
+Current setup:
+
+* The application is hosted on Railway.
+* Its PostgreSQL database is hosted on Railway.
+* The code is stored in GitHub.
+* I want the PostgreSQL database moved to Supabase.
+* I want the application hosted on Vercel.
+* My production domain will be https://pathwise.nyc.
+
+First, inspect the entire project and identify:
+
+1. The frontend framework.
+2. The backend framework.
+3. Whether the frontend and backend are in the same project.
+4. The database library or ORM being used.
+5. Every file that references Railway, DATABASE_URL, PostgreSQL credentials, application URLs, API URLs, authentication callback URLs, file storage, or deployment configuration.
+6. Whether the current backend can run on Vercel serverless functions.
+7. Whether the application uses persistent processes, local file storage, WebSockets, background workers, scheduled jobs, or other features that may not work directly on Vercel.
+
+Then update the project so that:
+
+1. Railway-specific database configuration is removed.
+2. The application uses environment variables rather than hardcoded credentials.
+3. The production database connects to Supabase PostgreSQL.
+4. The appropriate Supabase connection is used for a Vercel serverless environment.
+5. Existing database migrations and ORM configuration continue to work.
+6. A `.env.example` file is created containing variable names only, with no secret values.
+7. Secrets are never committed to GitHub or exposed to client-side code.
+8. The application can be deployed through Vercel from GitHub.
+9. Any required Vercel configuration files are created or corrected.
+10. Build, start, API, routing, and output settings are corrected for Vercel.
+11. Production URLs and authentication redirects use https://pathwise.nyc.
+12. Development URLs continue to work locally.
+13. All Railway-specific deployment files, plugins, and variables that are no longer needed are identified before removal.
+
+Do not delete the current Railway database or deployment.
+
+Before editing, provide:
+
+* A summary of the current architecture.
+* A list of the exact files that need to change.
+* A list of environment variables I need to obtain from Supabase.
+* A list of environment variables I need to add to Vercel.
+* Any compatibility problems that would prevent the backend from running on Vercel.
+
+After making the changes:
+
+* Show me every file changed.
+* Explain each change.
+* Run the existing tests.
+* Run the production build.
+* Fix any build or TypeScript errors.
+* Confirm that no Railway credentials remain in the source code.
+* Provide the exact commands needed to migrate the existing Railway PostgreSQL schema and data into Supabase.
+* Provide a deployment checklist for GitHub, Supabase, Vercel, and pathwise.nyc.
+
+Do not generate fake credentials or overwrite working secrets. Use placeholders such as SUPABASE_DATABASE_URL.
