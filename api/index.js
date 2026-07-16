@@ -4156,7 +4156,7 @@ var init_networking = __esm({
   }
 });
 
-// api/index.ts
+// server/vercel-entry.ts
 import express from "express";
 import cookieParser from "cookie-parser";
 
@@ -9383,7 +9383,7 @@ ${text2.trim()}` }
   return httpServer;
 }
 
-// api/index.ts
+// server/vercel-entry.ts
 var app = express();
 app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "15mb" }));
