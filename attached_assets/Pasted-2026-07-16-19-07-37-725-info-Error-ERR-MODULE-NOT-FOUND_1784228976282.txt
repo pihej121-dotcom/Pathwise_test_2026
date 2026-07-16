@@ -1,0 +1,30 @@
+2026-07-16 19:07:37.725 [info] Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/server/routes' imported from /var/task/api/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:277:11)
+    at moduleResolve (node:internal/modules/esm/resolve:871:10)
+    at moduleResolveWithNodePath (node:internal/modules/esm/resolve:998:14)
+    at defaultResolve (node:internal/modules/esm/resolve:1041:79)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:701:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:721:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:56)
+    at #resolve (node:internal/modules/esm/loader:683:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:603:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:163:33) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///var/task/server/routes'
+}
+Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/server/routes' imported from /var/task/api/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:277:11)
+    at moduleResolve (node:internal/modules/esm/resolve:871:10)
+    at moduleResolveWithNodePath (node:internal/modules/esm/resolve:998:14)
+    at defaultResolve (node:internal/modules/esm/resolve:1041:79)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:701:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:721:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:56)
+    at #resolve (node:internal/modules/esm/loader:683:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:603:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:163:33) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///var/task/server/routes'
+}
+Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
