@@ -1,39 +1,21 @@
 import { Resend } from 'resend';
 
-let connectionSettings: any;
-
-async function getCredentials() {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+/**
+ * Returns a Resend client configured from the RESEND_API_KEY environment variable.
+ * Works in any hosting environment (Vercel, Railway, Replit, local dev).
+ */
+export function getResendClient(): { client: Resend; fromEmail: string } {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY environment variable is not set.');
   }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  if (!connectionSettings || (!connectionSettings.settings.api_key)) {
-    throw new Error('Resend not connected');
-  }
-  return {apiKey: connectionSettings.settings.api_key, fromEmail: connectionSettings.settings.from_email};
+  const fromEmail =
+    process.env.RESEND_FROM_EMAIL || 'Pathwise <noreply@pathwise.nyc>';
+  return { client: new Resend(apiKey), fromEmail };
 }
 
-export async function getUncachableResendClient() {
-  const {apiKey, fromEmail} = await getCredentials();
-  return {
-    client: new Resend(apiKey),
-    fromEmail: fromEmail || 'Pathwise <noreply@pathwiseinstitutions.org>'
-  };
+// Legacy async wrapper kept for backward compatibility with email.ts callers
+// that use `await getUncachableResendClient()`.
+export async function getUncachableResendClient(): Promise<{ client: Resend; fromEmail: string }> {
+  return getResendClient();
 }

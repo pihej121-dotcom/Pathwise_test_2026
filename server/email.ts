@@ -50,7 +50,7 @@ export interface WelcomeEmailData {
   firstName: string;
 }
 
-/* ✅ 1. Clean, Railway-friendly Resend client setup */
+/* ✅ 1. Resend client — reads RESEND_API_KEY directly (works on Vercel, Railway, local dev) */
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail =
@@ -58,7 +58,8 @@ function getResendClient() {
 
   if (!apiKey) {
     throw new Error(
-      "RESEND_API_KEY not found in environment variables. Please set it in Railway."
+      "RESEND_API_KEY not found in environment variables. " +
+      "Set it in Vercel → Project → Settings → Environment Variables."
     );
   }
 
@@ -71,15 +72,12 @@ function getResendClient() {
 /* ✅ 2. Main EmailService */
 export class EmailService {
   private getBaseUrl(): string {
-    // Detect Railway or production
-    if (process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === "production") {
-      return "https://pathwise.nyc"; // <-- use your live domain
+    // Use APP_URL when set (should be https://pathwise.nyc in production).
+    if (process.env.APP_URL) {
+      return process.env.APP_URL;
     }
-
-    // Development fallback
-    return process.env.REPLIT_DOMAINS
-      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
-      : "http://localhost:5000";
+    // Local development fallback.
+    return "http://localhost:5000";
   }
 
   async sendEmailVerification(data: EmailVerificationData): Promise<boolean> {

@@ -5,17 +5,14 @@ const config: CapacitorConfig = {
   appName: 'Pathwise',
   webDir: 'dist/public',
   server: {
-    // For development: point to your Replit server
-    // Replace with your production URL when deploying
-    url: process.env.REPL_ID 
-      ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-      : undefined,
+    // For development: set APP_URL to your local or dev server URL.
+    // For production builds, leave APP_URL unset so the app uses its bundled assets.
+    url: process.env.APP_URL,
     cleartext: true,
     androidScheme: 'https'
   },
   ios: {
     contentInset: 'automatic',
-    // Allow all URLs for navigation
     allowsLinkPreview: true,
   },
   plugins: {

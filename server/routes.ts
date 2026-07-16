@@ -4056,9 +4056,7 @@ In 2–3 sentences: if this were a real interview, what would a hiring manager's
         return res.status(400).json({ error: "No Stripe customer found" });
       }
 
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? (process.env.REPLIT_DEV_DOMAIN.startsWith('http') ? process.env.REPLIT_DEV_DOMAIN : `https://${process.env.REPLIT_DEV_DOMAIN}`)
-        : 'http://localhost:5000';
+      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
 
       // Create billing portal session
       const session = await stripe.billingPortal.sessions.create({
