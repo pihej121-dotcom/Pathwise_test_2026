@@ -334,6 +334,18 @@ export default function ChatHome() {
     }
   }, [user?.id]);
 
+  // Auto-save session whenever messages grow — so conversations are persisted
+  // even if the user navigates away before an AI flow fully completes.
+  useEffect(() => {
+    if (!user || messages.length < 2 || !currentSessionPrompt) return;
+    // Debounce: only write after messages settle for 1 second
+    const timer = setTimeout(() => {
+      const updated = saveSession(user.id, currentSessionPrompt, messages);
+      setSavedSessions(updated);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [messages, currentSessionPrompt, user?.id]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
