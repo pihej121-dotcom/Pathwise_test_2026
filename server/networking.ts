@@ -72,11 +72,11 @@ export interface UserNetworkingProfile {
 }
 
 interface SearchKeywords {
-  groupKeywords: string;   // for LinkedIn URL + Reddit/Discord/Slack SearXNG
-  eventKeywords: string;   // for Eventbrite/Meetup SearXNG (location appended at search time)
+  groupKeywords: string;   // for LinkedIn URL + Reddit/Discord/Slack Tavily search
+  eventKeywords: string;   // for Eventbrite/Meetup Tavily search (location appended at search time)
 }
 
-interface SearXNGResult {
+interface TavilyResult {
   url: string;
   title: string;
   content: string;
@@ -162,29 +162,36 @@ async function validateUrl(url: string, timeoutMs = 6000): Promise<boolean> {
   }
 }
 
-async function searxSearch(query: string, timeoutMs = 10000): Promise<SearXNGResult[]> {
-  const base = process.env.SEARXNG_URL;
-  if (!base) {
-    console.warn("SEARXNG_URL not set");
+async function tavilySearch(query: string, timeoutMs = 10000): Promise<TavilyResult[]> {
+  const apiKey = process.env.TAVILY_API_KEY;
+  if (!apiKey) {
+    console.warn("TAVILY_API_KEY not set");
     return [];
   }
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(
-      `${base}/search?q=${encodeURIComponent(query)}&format=json`,
-      { signal: controller.signal, headers: { Accept: "application/json" } }
-    );
+    const res = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query,
+        search_depth: "basic",
+        max_results: 10,
+        include_answer: false,
+      }),
+    });
     clearTimeout(timer);
-    if (res.status === 403) {
-      console.error("SearXNG 403 — enable json in settings.yml: search.formats: [html, json]");
+    if (!res.ok) {
+      console.error(`Tavily error: ${res.status} ${await res.text()}`);
       return [];
     }
-    if (!res.ok) { console.error(`SearXNG error: ${res.status}`); return []; }
-    const data = await res.json() as { results?: SearXNGResult[] };
+    const data = await res.json() as { results?: TavilyResult[] };
     return data.results || [];
   } catch (err: any) {
-    console.error("SearXNG fetch failed:", err.message);
+    console.error("Tavily fetch failed:", err.message);
     return [];
   }
 }
@@ -198,8 +205,8 @@ export async function fetchEvents(
   const locSuffix = location ? ` ${location}` : "";
 
   const [ebResults, muResults] = await Promise.all([
-    searxSearch(`site:eventbrite.com ${eventKeywords}${locSuffix}`),
-    searxSearch(`site:meetup.com ${eventKeywords}${locSuffix}`),
+    tavilySearch(`site:eventbrite.com ${eventKeywords}${locSuffix}`),
+    tavilySearch(`site:meetup.com ${eventKeywords}${locSuffix}`),
   ]);
 
   const candidates = [
@@ -254,7 +261,7 @@ export async function fetchSocialGroups(
   ];
 }
 
-// ── forums (Reddit + Discord/Slack via SearXNG, validated) ───────────────────
+// ── forums (Reddit + Discord/Slack via Tavily, validated) ────────────────────
 
 export async function fetchForums(
   groupKeywords: string,
@@ -262,14 +269,14 @@ export async function fetchForums(
   topGaps: string[]
 ): Promise<CommunityForum[]> {
   const [redditResults, discordResults, slackResults] = await Promise.all([
-    searxSearch(`site:reddit.com ${groupKeywords}`),
-    searxSearch(`${groupKeywords} discord community server`),
-    searxSearch(`${groupKeywords} slack community workspace`),
+    tavilySearch(`site:reddit.com ${groupKeywords}`),
+    tavilySearch(`${groupKeywords} discord community server`),
+    tavilySearch(`${groupKeywords} slack community workspace`),
   ]);
 
   const gapTerm = topGaps.length ? topGaps[0] : "";
 
-  const candidates: Array<SearXNGResult & { inferredPlatform: string }> = [
+  const candidates: Array<TavilyResult & { inferredPlatform: string }> = [
     ...redditResults
       .filter((r) => /reddit\.com\/r\/[a-zA-Z0-9_]+\/?$/.test(r.url))
       .slice(0, 6)
